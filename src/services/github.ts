@@ -68,6 +68,8 @@ export const GITHUB_ERROR_CODES = {
   INVALID_CONFIG: '[E063] Invalid GitHub configuration',
   API_ERROR: '[E064] GitHub API error',
   ARTIFACT_NOT_FOUND: '[E065] Artifact not found',
+  DOWNLOAD_FAILED: '[E066] Artifact download failed',
+  EXTRACTION_FAILED: '[E067] Artifact extraction failed',
 } as const;
 
 // ============================================================================
