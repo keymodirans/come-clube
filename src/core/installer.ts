@@ -470,6 +470,7 @@ export async function getToolStatus(): Promise<{
   ffmpeg: { installed: boolean; path: string; version?: string };
   ytdlp: { installed: boolean; path: string; version?: string };
   deno: { installed: boolean; path: string; version?: string };
+  mediapipe: { installed: boolean; version?: string };
 }> {
   const [ffmpegInstalled, ytdlpInstalled, denoInstalled] = await Promise.all([
     isToolInstalled(TOOLS.FFMPEG),
@@ -482,6 +483,9 @@ export async function getToolStatus(): Promise<{
     ytdlpInstalled ? getToolVersion(TOOLS.YT_DLP) : Promise.resolve(null),
     denoInstalled ? getToolVersion(TOOLS.DENO) : Promise.resolve(null),
   ]);
+
+  // Check MediaPipe installation
+  const mediapipeStatus = await checkMediaPipeInstalled();
 
   return {
     ffmpeg: {
@@ -499,7 +503,126 @@ export async function getToolStatus(): Promise<{
       path: getBinPath(TOOLS.DENO),
       version: denoVersion || undefined,
     },
+    mediapipe: {
+      installed: mediapipeStatus.installed,
+      version: mediapipeStatus.version || undefined,
+    },
   };
+}
+
+/**
+ * Check if MediaPipe is installed via pip
+ * @returns Object with installed status and version
+ */
+export async function checkMediaPipeInstalled(): Promise<{
+  installed: boolean;
+  version?: string;
+}> {
+  const isWindows = PLATFORM === 'win32';
+  const pythonCommands = isWindows ? ['python', 'py'] : ['python3', 'python'];
+
+  for (const cmd of pythonCommands) {
+    try {
+      const result = await spawnPythonCommand(
+        cmd,
+        ['-c', 'import mediapipe; print(mediapipe.__version__)']
+      );
+      if (result.success && result.stdout.trim()) {
+        return {
+          installed: true,
+          version: result.stdout.trim(),
+        };
+      }
+    } catch {
+      // Continue to next command
+    }
+  }
+
+  return { installed: false };
+}
+
+/**
+ * Install MediaPipe using pip
+ * @param pythonCmd - Python command to use (optional, will auto-detect)
+ * @returns true if installation succeeded
+ */
+export async function installMediaPipe(pythonCmd?: string): Promise<boolean> {
+  const isWindows = PLATFORM === 'win32';
+  const pythonCommands = pythonCmd
+    ? [pythonCmd]
+    : isWindows
+    ? ['python', 'py']
+    : ['python3', 'python'];
+
+  for (const cmd of pythonCommands) {
+    try {
+      log(`Installing MediaPipe and OpenCV using ${cmd}...`);
+
+      const result = await spawnPythonCommand(
+        cmd,
+        ['-m', 'pip', 'install', '-q', 'mediapipe', 'opencv-python']
+      );
+
+      if (result.success) {
+        // Verify installation
+        const checkResult = await checkMediaPipeInstalled();
+        if (checkResult.installed) {
+          success(`MediaPipe ${checkResult.version} installed successfully`);
+          return true;
+        }
+      }
+    } catch {
+      // Continue to next command
+    }
+  }
+
+  error('Failed to install MediaPipe');
+  return false;
+}
+
+/**
+ * Spawn a Python command and capture output
+ * @param command - Python command to run
+ * @param args - Arguments to pass
+ * @returns Promise with result
+ */
+async function spawnPythonCommand(
+  command: string,
+  args: string[]
+): Promise<{ success: boolean; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+
+    const proc = spawn(command, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120000, // 2 minutes timeout
+    });
+
+    proc.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      resolve({
+        success: code === 0,
+        stdout,
+        stderr,
+      });
+    });
+
+    proc.on('error', () => {
+      resolve({
+        success: false,
+        stdout,
+        stderr,
+      });
+    });
+  });
 }
 
 // Import logger functions for internal use

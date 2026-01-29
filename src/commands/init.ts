@@ -20,6 +20,8 @@ import {
   getToolStatus,
   getBinPath,
   TOOLS,
+  installMediaPipe,
+  checkMediaPipeInstalled,
   type ProgressCallback,
 } from '../core/installer.js';
 
@@ -77,33 +79,15 @@ export const initCommand = new Command('init')
     const status = await getToolStatus();
 
     p.intro('Tool Installation Status');
+    blank();
 
-    const toolsTable: p.TableOptions = {
-      columns: [
-        { name: 'tool', header: 'Tool' },
-        { name: 'status', header: 'Status' },
-        { name: 'version', header: 'Version' },
-      ],
-      rows: [
-        {
-          tool: 'FFmpeg',
-          status: status.ffmpeg.installed ? 'Installed' : 'Not installed',
-          version: status.ffmpeg.installed ? (status.ffmpeg.version || 'unknown') : '-',
-        },
-        {
-          tool: 'yt-dlp',
-          status: status.ytdlp.installed ? 'Installed' : 'Not installed',
-          version: status.ytdlp.installed ? (status.ytdlp.version || 'unknown') : '-',
-        },
-        {
-          tool: 'Deno',
-          status: status.deno.installed ? 'Installed' : 'Not installed',
-          version: status.deno.installed ? (status.deno.version || 'unknown') : '-',
-        },
-      ],
-    };
-
-    p.table(toolsTable);
+    // Display tool status (manual table for compatibility)
+    log('Tool          Status          Version');
+    log('------------- --------------- -------------------');
+    log('FFmpeg        ' + (status.ffmpeg.installed ? 'Installed  ' : 'Not installed') + '  ' + (status.ffmpeg.installed ? (status.ffmpeg.version || 'unknown') : '-'));
+    log('yt-dlp        ' + (status.ytdlp.installed ? 'Installed  ' : 'Not installed') + '  ' + (status.ytdlp.installed ? (status.ytdlp.version || 'unknown') : '-'));
+    log('Deno          ' + (status.deno.installed ? 'Installed  ' : 'Not installed') + '  ' + (status.deno.installed ? (status.deno.version || 'unknown') : '-'));
+    log('MediaPipe     ' + (status.mediapipe.installed ? 'Installed  ' : 'Not installed') + '  ' + (status.mediapipe.installed ? (status.mediapipe.version || 'unknown') : '-'));
     blank();
 
     // Determine what needs to be installed
@@ -111,13 +95,36 @@ export const initCommand = new Command('init')
     let needsYtDlp = !status.ytdlp.installed;
 
     if (!needsFFmpeg && !needsYtDlp) {
-      success('All tools are already installed!');
+      success('Core tools are already installed!');
       blank();
-      log(`FFmpeg: ${getBinPath(TOOLS.FFMPEG)}`);
-      log(`yt-dlp: ${getBinPath(TOOLS.YT_DLP)}`);
+      log('FFmpeg: ' + getBinPath(TOOLS.FFMPEG));
+      log('yt-dlp: ' + getBinPath(TOOLS.YT_DLP));
       if (status.deno.installed) {
-        log(`Deno: ${getBinPath(TOOLS.DENO)}`);
+        log('Deno: ' + getBinPath(TOOLS.DENO));
       }
+
+      // Offer MediaPipe installation if not installed
+      if (!status.mediapipe.installed) {
+        blank();
+        info('MediaPipe (optional) - Enables intelligent face detection for video cropping');
+        blank();
+        const installMPPrompt = await p.confirm({
+          message: 'Install MediaPipe for face detection?',
+          initialValue: false,
+        });
+
+        if (installMPPrompt) {
+          blank();
+          await installMediaPipe();
+          blank();
+        } else {
+          blank();
+          info('You can install MediaPipe later with:');
+          log('  pip install mediapipe opencv-python');
+          blank();
+        }
+      }
+
       separator();
       return;
     }
@@ -244,6 +251,30 @@ export const initCommand = new Command('init')
       blank();
     }
 
+    // Offer MediaPipe installation
+    blank();
+    separator();
+    log('MediaPipe Installation (Optional)');
+    blank();
+    info('MediaPipe enables intelligent face detection for automatic video cropping.');
+    info('When enabled, videos with multiple faces will use split-screen layout.');
+    blank();
+    const installMPPrompt = await p.confirm({
+      message: 'Install MediaPipe for face detection?',
+      initialValue: false,
+    });
+
+    if (installMPPrompt) {
+      blank();
+      await installMediaPipe();
+      blank();
+    } else {
+      blank();
+      info('You can install MediaPipe later with:');
+      log('  pip install mediapipe opencv-python');
+      blank();
+    }
+
     // Show final status
     separator();
     log('Installation Summary');
@@ -252,13 +283,13 @@ export const initCommand = new Command('init')
     const finalStatus = await getToolStatus();
 
     if (finalStatus.ffmpeg.installed) {
-      success(`FFmpeg: installed at ${getBinPath(TOOLS.FFMPEG)}`);
+      success('FFmpeg: installed at ' + getBinPath(TOOLS.FFMPEG));
     }
     if (finalStatus.ytdlp.installed) {
-      success(`yt-dlp: installed at ${getBinPath(TOOLS.YT_DLP)}`);
+      success('yt-dlp: installed at ' + getBinPath(TOOLS.YT_DLP));
     }
     if (finalStatus.deno.installed) {
-      success(`Deno: installed at ${getBinPath(TOOLS.DENO)}`);
+      success('Deno: installed at ' + getBinPath(TOOLS.DENO));
     }
 
     blank();
