@@ -99,7 +99,8 @@ export async function runCli(): Promise<void> {
 }
 
 // Allow direct execution for testing
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Check if this is the main module (works with both Node.js and pkg)
+if (process.argv[1] && process.argv[1].endsWith('index.js')) {
   runCli().catch(() => {
     // Already logged by checkLicense, just exit
     process.exit(1);

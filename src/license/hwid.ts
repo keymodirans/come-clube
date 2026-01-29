@@ -12,7 +12,9 @@ import fs from 'fs';
 import { createRequire } from 'module';
 
 // node-machine-id is CommonJS, use createRequire
-const require = createRequire(import.meta.url);
+// Use __dirname fallback for pkg compatibility
+const modulePath = typeof __filename !== 'undefined' ? __filename : import.meta.url;
+const require = createRequire(modulePath);
 const machineIdModule = require('node-machine-id');
 
 /**
