@@ -176,12 +176,12 @@ Create standalone binaries for distribution.
 |-------|------|--------|----------|
 | 01 | Project Foundation | \u2713 | 100% |
 | 02 | License & Config | \u2713 | 100% |
-| 03 | External Tools Installer | \u25cb | 0% |
-| 04 | Video Pipeline | \u25cb | 0% |
-| 05 | Transcription Service | \u25cb | 0% |
-| 06 | Viral Analysis Service | \u25cb | 0% |
-| 07 | Face Detection | \u25cb | 0% |
-| 08: Props Builder & Storage | \u25cb | 0% |
-| 09: GitHub Actions Integration | \u25cb | 0% |
-| 10: Post-Processing & Pipeline | \u25cb | 0% |
-| 11: Build & Packaging | \u25cb | 0% |
+| 03 | External Tools Installer | \u2713 | 100% |
+| 04 | Video Pipeline | \u2713 | 100% |
+| 05 | Transcription Service | \u2713 | 100% |
+| 06 | Viral Analysis Service | \u2713 | 100% |
+| 07 | Face Detection | \u2713 | 100% |
+| 08: Props Builder & Storage | \u2713 | 100% |
+| 09: GitHub Actions Integration | \u2713 | 100% |
+| 10: Post-Processing & Pipeline | \u2713 | 100% |
+| 11: Build & Packaging | * | 95% |
