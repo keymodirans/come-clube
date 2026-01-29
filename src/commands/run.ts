@@ -11,6 +11,7 @@ import { ERROR_CODES } from '../license/validator.js';
 import { log, success, error, blank, separator } from '../utils/logger.js';
 import { downloadVideo, extractAudio, cleanup, isValidYouTubeUrl, checkToolsInstalled } from '../core/downloader.js';
 import { withRetry } from '../utils/retry.js';
+import { transcribe, type TranscriptResult } from '../core/transcriber.js';
 
 export const runCommand = new Command('run')
   .description('Process a YouTube video and generate viral clips')
@@ -132,16 +133,42 @@ export const runCommand = new Command('run')
       log(`Size: ${(audioResult.size / 1024 / 1024).toFixed(2)} MB`);
       blank();
 
-      // TODO: Continue with transcription in Phase 05
-      separator();
-      log('Download and audio extraction complete!');
+      // Step 3: Transcribe audio using Deepgram
+      log('> Transcribing with Deepgram...');
       blank();
-      log('Next steps (coming in Phase 05):');
-      log('  1. Transcribe using Deepgram API');
-      log('  2. Detect viral segments using Gemini');
-      log('  3. Generate Remotion props JSON');
-      log('  4. Trigger cloud rendering via GitHub Actions');
-      log('  5. Download and post-process rendered clips');
+      log(`Model: nova-3`);
+      log(`Language: ${options.language}`);
+      blank();
+
+      const transcriptResult = await withRetry(
+        () => transcribe(audioResult.audioPath, options.language as 'id' | 'en'),
+        {
+          maxRetries: 3,
+          baseDelayMs: 1000,
+          maxDelayMs: 30000,
+          onRetry: (attempt, err) => {
+            blank();
+            error(`Transcription failed (attempt ${attempt}), retrying...`);
+            log(`  Error: ${err.message}`);
+            blank();
+          },
+        }
+      );
+
+      blank();
+      success(`Transcript ready (${transcriptResult.words.length} words)`);
+      log(`Duration: ${Math.floor(transcriptResult.duration / 60)}:${Math.floor(transcriptResult.duration % 60).toString().padStart(2, '0')}`);
+      blank();
+
+      // TODO: Continue with viral segment detection in Phase 06
+      separator();
+      log('Transcription complete!');
+      blank();
+      log('Next steps (coming in Phase 06):');
+      log('  1. Detect viral segments using Gemini');
+      log('  2. Generate Remotion props JSON');
+      log('  3. Trigger cloud rendering via GitHub Actions');
+      log('  4. Download and post-process rendered clips');
       separator();
       blank();
 
