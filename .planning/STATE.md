@@ -5,17 +5,17 @@
 | Item | Status |
 |------|--------|
 | Repository | C:/Users/Rekabit/Downloads/cli-cliper |
-| GSD | Phase 10 - Post-Processing Complete |
-| Last Activity | 2026-01-30 - Completed 10-PLAN.md |
+| GSD | Phase 11 - Build & Packaging Complete |
+| Last Activity | 2026-01-30 - Completed 11-PLAN.md |
 
 ---
 
 ## Current Position
 
-**Phase:** 10 of 10 (Post-Processing)
-**Plan:** 10 (Post-Processing) - COMPLETE
+**Phase:** 11 of 11 (Build & Packaging)
+**Plan:** 11-01 (Build & Packaging) - COMPLETE
 **Status:** ALL PHASES COMPLETE
-**Progress:** ██████████ 100% (10/10 plans total)
+**Progress:** ██████████ 100% (11/11 plans total)
 
 ---
 
@@ -295,6 +295,41 @@
 - AAC audio at 128k bitrate
 - +faststart for web playback optimization
 
+### 036: ESM-First Distribution Strategy
+**Date:** 2026-01-30
+**Decision:** Use ESM as primary distribution format, acknowledge pkg limitations
+- Node.js >=20 is required engine, ESM is the future
+- pkg does not support Node.js 18+ or ESM properly
+- CommonJS transpilation adds complexity and loses some ESM features
+- npm handles all dependencies correctly when users `npm install -g`
+- Users must have Node.js installed (no true standalone binaries)
+
+### 037: String Concatenation for Prompt Templates
+**Date:** 2026-01-30
+**Decision:** Use string concatenation instead of template literals for prompts
+- Template literals evaluate placeholders at module load time
+- String concatenation defers evaluation to runtime when `.replace()` is called
+- Required for dynamic prompt generation with runtime values
+
+### 038: Build & Packaging Error Code Range [E080-E089]
+**Date:** 2026-01-30
+**Decision:** Dedicated error code range for build and packaging operations
+- E080: Build failed - TypeScript compilation error
+- E081: Build failed - Bundler error
+- E082: Package failed - pkg error
+- E083: Package failed - Native module incompatible
+- E084: Package failed - Asset bundling error
+- E085: Distribution failed - Release creation error
+
+### 039: pkg Tool Limitations Documented
+**Date:** 2026-01-30
+**Decision:** Document known limitations with pkg for future resolution
+- pkg v5.8.1 does not support Node.js 18+ (only up to node16)
+- pkg cannot handle ESM modules with import.meta properly
+- pkg fails bundling native dependencies (node:sqlite in conf package)
+- Workaround: Use npm distribution instead of standalone binaries
+- Future options: nexe with --build, switch config package, use alternative bundlers
+
 ---
 
 ## Context Notes
@@ -313,7 +348,7 @@
 - Target ES2022, Module NodeNext
 - Error format: [E###] Description
 - CLI output: ASCII only, no emoji
-- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription), E030-E039 (analysis), E040-E049 (face detection), E050-E059 (props), E060-E069 (GitHub Actions), E070-E079 (post-process)
+- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription), E030-E039 (analysis), E040-E049 (face detection), E050-E059 (props), E060-E069 (GitHub Actions), E070-E079 (post-process), E080-E089 (build/packaging)
 
 ### Platform Notes
 - Windows environment requires PowerShell for npm commands
@@ -357,13 +392,15 @@ None
 - **Config Location**: conf package stores config.json in AppData instead of ~/.autocliper/ (acceptable but inconsistent)
 - **clack/prompts version**: Using 0.10.1 which lacks p.table() - consider upgrade
 - **Python Requirement**: Face detection requires Python + MediaPipe (optional feature)
+- **pkg ESM Limitations**: pkg cannot properly package ESM modules with import.meta, affects standalone binary creation
+- **Native Module Bundling**: conf package uses node:sqlite which pkg cannot bundle
 
 ---
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 00:55 UTC
-**Stopped At:** Completed 10-PLAN.md (Post-Processing)
+**Last Session:** 2026-01-30 03:30 UTC
+**Stopped At:** Completed 11-PLAN.md (Build & Packaging)
 **Resume File:** None (ALL PHASES COMPLETE)
 
 ---
@@ -382,3 +419,4 @@ None
 | 08 | 08 | Props Generation | .planning/phases/08-props-generation/08-08-SUMMARY.md |
 | 09 | 09 | GitHub Integration | .planning/phases/09-github-integration/09-09-SUMMARY.md |
 | 10 | 10 | Post-Processing | .planning/phases/10-post-processing/10-SUMMARY.md |
+| 11 | 01 | Build & Packaging | .planning/phases/11-build-packaging/11-01-SUMMARY.md |
