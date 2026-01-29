@@ -5,17 +5,17 @@
 | Item | Status |
 |------|--------|
 | Repository | C:/Users/Rekabit/Downloads/cli-cliper |
-| GSD | Phase 03 - External Tools Installer Complete |
-| Last Activity | 2026-01-30 - Completed 03-01-PLAN.md |
+| GSD | Phase 04 - Video Pipeline Complete |
+| Last Activity | 2026-01-30 - Completed 04-01-PLAN.md |
 
 ---
 
 ## Current Position
 
-**Phase:** 03 of [unknown] (External Tools Installer)
-**Plan:** 03-01 (External Tools Installer) - COMPLETE
+**Phase:** 04 of [unknown] (Video Pipeline)
+**Plan:** 04-01 (Video Pipeline - Download + Audio) - COMPLETE
 **Status:** Phase complete
-**Progress:** ████████░░ 40% (3/6 plans total)
+**Progress:** █████████░ 53% (4/6 plans total)
 
 ---
 
@@ -86,6 +86,36 @@
 - Use string concatenation for table display
 - Consider upgrading to latest version for table support
 
+### 010: 16kHz Mono Audio for Deepgram
+**Date:** 2026-01-30
+**Decision:** Audio extraction uses 16kHz sample rate and mono channel
+- Deepgram API requires 16kHz for optimal transcription
+- PCM 16-bit little-endian codec for WAV compatibility
+- Not using 44.1kHz stereo (unnecessary for speech-to-text)
+
+### 011: cli-progress for Progress Tracking
+**Date:** 2026-01-30
+**Decision:** Use cli-progress library instead of manual implementation
+- Already in dependencies from project setup
+- ASCII-only format: `[=========>] 45% | 28MB/62MB`
+- Spinner class for non-numeric progress
+
+### 012: Exponential Backoff Retry Pattern
+**Date:** 2026-01-30
+**Decision:** Retry with exponential backoff for network operations
+- Formula: min(baseDelayMs * 2^attempt, maxDelayMs)
+- Default: 1s, 2s, 4s, 8s, 16s, 30s max
+- onRetry callback for logging
+- Generic withRetry<T>() function for any async operation
+
+### 013: Temp File Cleanup on Both Paths
+**Date:** 2026-01-30
+**Decision:** Cleanup temp files on both success and error paths
+- Track temp files in array during processing
+- Call cleanup() in try block (success) and catch block (error)
+- Ignore ENOENT errors in cleanup (file may already be deleted)
+- Use os.tmpdir() for cross-platform temp directory
+
 ---
 
 ## Context Notes
@@ -110,13 +140,21 @@
 - Node v24.13.0 in use (newer than required 20.0.0)
 - Config stored in ~/.autocliper/device.lock and AppData (conf package default)
 - Tools installed to ~/.autocliper/bin/ with platform-specific extensions
+- Temp files created in os.tmpdir() (platform-specific temp directory)
 
 ### Tool Installation
 - FFmpeg 7.1 auto-installed from platform-specific sources
 - yt-dlp 2025.10.22 (no Deno) or 2025.11.12+ (with Deno)
 - Deno optional but recommended for full YouTube support
-- Download progress displayed via ora spinners
+- Download progress displayed via cli-progress bars
 - Executable permissions set automatically on Unix
+
+### Video Processing
+- YouTube download via yt-dlp with progress tracking
+- Audio extraction to WAV (16kHz mono) for Deepgram
+- FFmpeg used for audio extraction with pcm_s16le codec
+- Retry logic with exponential backoff for network operations
+- Temp file cleanup on success/error paths
 
 ---
 
@@ -135,8 +173,8 @@ None
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 01:10 UTC
-**Stopped At:** Completed 03-01-PLAN.md (External Tools Installer)
+**Last Session:** 2026-01-30 02:46 UTC
+**Stopped At:** Completed 04-01-PLAN.md (Video Pipeline - Download + Audio)
 **Resume File:** None (ready for next plan)
 
 ---
@@ -148,3 +186,4 @@ None
 | 01 | 01 | Project Foundation | .planning/phases/01-foundation/01-01-SUMMARY.md |
 | 02 | 01 | License & Config System | .planning/phases/02-license-config/02-01-SUMMARY.md |
 | 03 | 01 | External Tools Installer | .planning/phases/03-installer/03-01-SUMMARY.md |
+| 04 | 01 | Video Pipeline (Download + Audio) | .planning/phases/04-video-pipeline/04-01-SUMMARY.md |
