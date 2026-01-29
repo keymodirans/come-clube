@@ -5,17 +5,17 @@
 | Item | Status |
 |------|--------|
 | Repository | C:/Users/Rekabit/Downloads/cli-cliper |
-| GSD | Phase 06 - Viral Analysis Complete |
-| Last Activity | 2026-01-30 - Completed 06-PLAN.md |
+| GSD | Phase 08 - Props Builder & Storage Complete |
+| Last Activity | 2026-01-30 - Completed 08-PLAN.md |
 
 ---
 
 ## Current Position
 
-**Phase:** 06 of 10 (Viral Analysis)
-**Plan:** 06 (Viral Analysis Service - Gemini AI) - COMPLETE
+**Phase:** 08 of 10 (Props Builder & Storage)
+**Plan:** 08 (Props Builder & Storage) - COMPLETE
 **Status:** Phase complete
-**Progress:** ███████████ 80% (6/7.5 plans total)
+**Progress:** ████████████ 88% (7/8 plans total)
 
 ---
 
@@ -156,6 +156,41 @@
 - Timestamps embedded every 30 words for segment localization
 - Temperature 0.3, topP 0.8 for consistent detection
 
+### 019: file.io for Temporary File Storage
+**Date:** 2026-01-30
+**Decision:** Use file.io API for temporary video hosting
+- 100 files/day free tier with no authentication required
+- Returns direct download URL for GitHub Actions renderer
+- Automatic expiration (1 day default) for storage efficiency
+- Multipart form data upload with Buffer concatenation for binary data
+
+### 020: Remotion Props Schema Definition
+**Date:** 2026-01-30
+**Decision:** Remotion props structure with TypeScript interfaces
+- SegmentProps: id, fps (30), dimensions (1080x1920), durationInFrames
+- videoSrc: download URL from file.io after upload
+- videoStartTime: segment start time in seconds
+- cropMode: CENTER (single face) or SPLIT (multiple faces)
+- words: PropWord[] with punctuated_word, start, end for subtitles
+- SubtitleStyle: Montserrat font, 48px, bold, white with yellow highlight
+- HookStyle: 90 frames (3 seconds), top overlay with semi-transparent background
+
+### 021: Error Codes [E040-E049] for Storage Operations
+**Date:** 2026-01-30
+**Decision:** Storage-specific error code range
+- E040: File not found / Upload failed
+- E041: Invalid response from storage service
+- E042: File size exceeds maximum (500MB)
+- E043: Upload timed out
+- Retry logic with exponential backoff for transient failures
+
+### 022: Props Debug Output to Temp Directory
+**Date:** 2026-01-30
+**Decision:** Save props JSON to os.tmpdir()/autocliper-debug/ for debugging
+- Filename: props-{timestamp}.json
+- Allows inspection of Remotion props before rendering
+- Useful for troubleshooting subtitle sync and crop configuration
+
 ---
 
 ## Context Notes
@@ -173,7 +208,7 @@
 - Target ES2022, Module NodeNext
 - Error format: [E###] Description
 - CLI output: ASCII only, no emoji
-- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription), E030-E039 (analysis)
+- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription), E030-E039 (analysis), E040-E049 (storage), E050-E059 (post-process)
 
 ### Platform Notes
 - Windows environment requires PowerShell for npm commands
@@ -217,8 +252,8 @@ None
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 03:00 UTC
-**Stopped At:** Completed 06-PLAN.md (Viral Analysis)
+**Last Session:** 2026-01-30 03:17 UTC
+**Stopped At:** Completed 08-PLAN.md (Props Builder & Storage)
 **Resume File:** None (ready for next plan)
 
 ---
@@ -233,3 +268,4 @@ None
 | 04 | 01 | Video Pipeline (Download + Audio) | .planning/phases/04-video-pipeline/04-01-SUMMARY.md |
 | 05 | 01 | Transcription Service | .planning/phases/05-transcription/05-01-SUMMARY.md |
 | 06 | 06 | Viral Analysis | .planning/phases/06-viral-analysis/06-SUMMARY.md |
+| 08 | 08 | Props Builder & Storage | .planning/phases/08-props-storage/08-SUMMARY.md |
