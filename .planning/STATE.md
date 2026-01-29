@@ -5,17 +5,17 @@
 | Item | Status |
 |------|--------|
 | Repository | C:/Users/Rekabit/Downloads/cli-cliper |
-| GSD | Phase 02 - License & Config Complete |
-| Last Activity | 2026-01-29 - Completed 02-01-PLAN.md |
+| GSD | Phase 03 - External Tools Installer Complete |
+| Last Activity | 2026-01-30 - Completed 03-01-PLAN.md |
 
 ---
 
 ## Current Position
 
-**Phase:** 02 of [unknown] (License & Config)
-**Plan:** 02-01 (License & Config System) - COMPLETE
+**Phase:** 03 of [unknown] (External Tools Installer)
+**Plan:** 03-01 (External Tools Installer) - COMPLETE
 **Status:** Phase complete
-**Progress:** ██████░░░░ 30% (2/6 plans total)
+**Progress:** ████████░░ 40% (3/6 plans total)
 
 ---
 
@@ -63,6 +63,29 @@
 - Users can view device ID and reconfigure without valid license
 - PreAction hook with bypass list pattern
 
+### 007: yt-dlp Version Selection Strategy
+**Date:** 2026-01-30
+**Decision:** yt-dlp defaults to 2025.10.22 (no Deno required)
+- yt-dlp 2025.11.12+ requires Deno for full YouTube support
+- Auto-detect Deno and offer version choice to user
+- Options: Install Deno + latest, use 2025.10.22, or skip
+- Version override via config.set('tools.ytdlp_version')
+
+### 008: Platform-Specific FFmpeg Sources
+**Date:** 2026-01-30
+**Decision:** Different FFmpeg sources per platform
+- Windows: github.com/BtbN/FFmpeg-Builds (win64-gpl.zip)
+- macOS: evermeet.cx/ffmpeg (single binary in zip)
+- Linux: johnvansickle.com/ffmpeg (release-amd64-static.tar.xz)
+- Extract and find binary in extracted files
+
+### 009: clack/prompts Table Compatibility
+**Date:** 2026-01-30
+**Decision:** Manual table formatting instead of p.table()
+- @clack/prompts 0.10.1 does not have p.table function
+- Use string concatenation for table display
+- Consider upgrading to latest version for table support
+
 ---
 
 ## Context Notes
@@ -80,12 +103,20 @@
 - Target ES2022, Module NodeNext
 - Error format: [E###] Description
 - CLI output: ASCII only, no emoji
-- Error codes: E001-E009 (license/HWID), E010-E019 (download), E020-E029 (transcription)
+- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription)
 
 ### Platform Notes
 - Windows environment requires PowerShell for npm commands
 - Node v24.13.0 in use (newer than required 20.0.0)
 - Config stored in ~/.autocliper/device.lock and AppData (conf package default)
+- Tools installed to ~/.autocliper/bin/ with platform-specific extensions
+
+### Tool Installation
+- FFmpeg 7.1 auto-installed from platform-specific sources
+- yt-dlp 2025.10.22 (no Deno) or 2025.11.12+ (with Deno)
+- Deno optional but recommended for full YouTube support
+- Download progress displayed via ora spinners
+- Executable permissions set automatically on Unix
 
 ---
 
@@ -98,13 +129,14 @@ None
 - **Node Version**: Running v24.13.0 vs required 20.0.0 - verify before production
 - **PowerShell Dependency**: Windows builds require PowerShell wrapper - document or find alternative
 - **Config Location**: conf package stores config.json in AppData instead of ~/.autocliper/ (acceptable but inconsistent)
+- **clack/prompts version**: Using 0.10.1 which lacks p.table() - consider upgrade
 
 ---
 
 ## Session Continuity
 
-**Last Session:** 2026-01-29 19:46 UTC
-**Stopped At:** Completed 02-01-PLAN.md (License & Config System)
+**Last Session:** 2026-01-30 01:10 UTC
+**Stopped At:** Completed 03-01-PLAN.md (External Tools Installer)
 **Resume File:** None (ready for next plan)
 
 ---
@@ -115,3 +147,4 @@ None
 |-------|------|------|---------|
 | 01 | 01 | Project Foundation | .planning/phases/01-foundation/01-01-SUMMARY.md |
 | 02 | 01 | License & Config System | .planning/phases/02-license-config/02-01-SUMMARY.md |
+| 03 | 01 | External Tools Installer | .planning/phases/03-installer/03-01-SUMMARY.md |
