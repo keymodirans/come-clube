@@ -18,6 +18,7 @@ import { buildProps, validateAllProps, type FaceDetectionResult, type SegmentPro
 import { uploadFile } from '../services/storage.js';
 import { GitHubService, generateJobId, type GitHubConfig, type WorkflowRun } from '../services/github.js';
 import type { UploadResult } from '../services/storage.js';
+import { postProcess, getOutputDir } from '../services/postProcess.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
@@ -460,6 +461,109 @@ export const runCommand = new Command('run')
         log(`    Job: ${job.jobId} | Status: ${job.status?.conclusion || 'unknown'}`);
       }
       blank();
+
+      // Step 9: Download rendered videos from artifacts
+      separator();
+      log('> Downloading rendered videos...');
+      blank();
+
+      const downloadedFiles: Array<{ index: number; path: string; segment: ViralSegment }> = [];
+
+      for (const job of renderJobs) {
+        if (job.status?.conclusion !== 'success') {
+          continue; // Skip failed jobs
+        }
+
+        const segment = analysisResult.segments[job.segmentIndex];
+        log(`[Job ${job.jobId}] Downloading artifact...`);
+
+        try {
+          const artifactPath = await githubService.downloadArtifact(job.runId!);
+          tempFiles.push(artifactPath); // Track for cleanup
+
+          log(`  Downloaded: ${artifactPath}`);
+          downloadedFiles.push({
+            index: job.segmentIndex,
+            path: artifactPath,
+            segment,
+          });
+          success(`Download complete`);
+        } catch (err) {
+          const errorObj = err as Error;
+          error(`Download failed: ${errorObj.message}`);
+        }
+        blank();
+      }
+
+      log(`Downloaded ${downloadedFiles.length} video(s)`);
+      blank();
+
+      // Step 10: Post-process videos with metadata randomization
+      separator();
+      log('> Post-processing videos...');
+      blank();
+
+      const outputFiles: Array<{ index: number; path: string; segment: ViralSegment }> = [];
+      const outputDir = await getOutputDir();
+
+      log(`Output directory: ${outputDir}`);
+      blank();
+
+      for (const file of downloadedFiles) {
+        const segment = file.segment;
+        log(`[Video ${file.index + 1}] Post-processing...`);
+
+        try {
+          const outputPath = await postProcess({
+            input: file.path,
+            segment: file.segment,
+            index: file.index,
+            showProgress: true,
+          });
+
+          outputFiles.push({
+            index: file.index,
+            path: outputPath,
+            segment: file.segment,
+          });
+
+          const filename = path.basename(outputPath);
+          success(`Post-processed: ${filename}`);
+        } catch (err) {
+          const errorObj = err as Error;
+          error(`Post-process failed: ${errorObj.message}`);
+        }
+        blank();
+      }
+
+      // Step 11: Display final summary
+      separator();
+      log('--- Complete ---');
+      blank();
+
+      if (outputFiles.length > 0) {
+        log(`Generated ${outputFiles.length} video(s):`);
+        blank();
+
+        for (let i = 0; i < outputFiles.length; i++) {
+          const file = outputFiles[i];
+          const stats = await fs.stat(file.path);
+          const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+          const filename = path.basename(file.path);
+
+          log(`  [${i + 1}] ${filename}`);
+          log(`      ${file.segment.hook_text.substring(0, 50)}${file.segment.hook_text.length > 50 ? '...' : ''}`);
+          log(`      ${file.segment.start} - ${file.segment.end} | ${sizeMB} MB`);
+          blank();
+        }
+
+        separator();
+        log(`Output folder: ${outputDir}`);
+        blank();
+      } else {
+        log('No videos were generated successfully.');
+        blank();
+      }
 
       // Cleanup temp files
       log('> Cleaning up temporary files...');
