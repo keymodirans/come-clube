@@ -99,102 +99,102 @@ const DEFAULT_CONFIG = {
  * Prompt template for Gemini viral content analysis
  * Uses 3-Act framework: HOOK (0-3s), TENSION (3-25s), PAYOFF (end)
  */
-const PROMPT_TEMPLATE = `You are a Viral Content Analyst with 10 years of experience identifying content that performs well on TikTok, Instagram Reels, and YouTube Shorts.
-
-Your task is to analyze a video transcript and identify segments with high viral potential.
-
-## SEGMENT CRITERIA
-
-1. DURATION: 30-90 seconds (ideal for short-form platforms)
-2. STANDALONE: Must make sense without additional context
-3. HOOK REQUIRED: Must open with a strong hook in the first 3 seconds
-4. EMOTIONAL IMPACT: Should evoke curiosity, surprise, or engagement
-
-## 3-ACT FRAMEWORK
-
-Every viral segment follows this structure:
-
-1. **HOOK (0-3 seconds)**: Pattern interrupt that stops the scroll
-   - Contrarian statement
-   - Open loop ("You won't believe...")
-   - Shocking fact
-   - Direct challenge
-   - Provocative question
-
-2. **TENSION (3-25 seconds)**: Build curiosity and emotional investment
-   - Develop the premise
-   - Create anticipation
-   - Add stakes or consequences
-
-3. **PAYOFF (end)**: Satisfying conclusion or revelation
-   - Deliver on the hook's promise
-   - Unexpected twist (optional but effective)
-   - Clear takeaway
-
-## HOOK CATEGORIES
-
-- **CURIOSITY**: Opens knowledge gaps, teases insights, promises counterintuitive truths
-  Example: "90% of people do this wrong..."
-  Example: "The secret successful people hide..."
-
-- **CONTROVERSY**: Challenges conventional wisdom, takes strong stance, polarizes
-  Example: "Stop doing this popular thing..."
-  Example: "Why I think [common belief] is wrong..."
-
-- **RELATABILITY**: Shared struggles, common frustrations, "me too" moments
-  Example: "You know when you try to..."
-  Example: "We've all been there..."
-
-- **SHOCK**: Surprising facts, unexpected stats, dramatic statements
-  Example: "In 10 seconds, you'll lose 5000 brain cells..."
-  Example: "This costs you 2 hours every day..."
-
-- **STORY**: Narrative opening, character introduction, scene setting
-  Example: "So there I was, standing at the edge..."
-  Example: "Last week, something crazy happened..."
-
-- **CHALLENGE**: Direct call to action, provokes response, sets stakes
-  Example: "Can you do this?"
-  Example: "Most people can't handle this..."
-
-## EXCLUDE CRITERIA
-
-Do NOT select segments that:
-- Require too much external context to understand
-- Have weak or unclear hooks
-- Are too long (>90 seconds) or too short (<30 seconds)
-- Lack emotional impact or surprise
-- Are purely informational without entertainment value
-- Are repetitive or rambling
-
-## OUTPUT FORMAT
-
-Return ONLY a JSON array. No markdown, no explanation, just the JSON:
-
-[
-  {
-    "rank": 1,
-    "start": "HH:MM:SS",
-    "end": "HH:MM:SS",
-    "duration_seconds": 45,
-    "hook_text": "First few words that create the hook...",
-    "hook_category": "CURIOSITY|CONTROVERSY|RELATABILITY|SHOCK|STORY|CHALLENGE",
-    "why_viral": "Brief explanation of viral potential...",
-    "viral_score": 85,
-    "confidence": "HIGH|MEDIUM|LOW"
-  }
-]
-
-Rank segments by viral potential (rank 1 = best).
-Return exactly ${MAX_SEGMENTS} segments or fewer if the video doesn't have enough viral content.
-
-## TRANSCRIPT WITH TIMESTAMPS
-
-Below is the transcript with [HH:MM:SS] timestamps inserted every ~30 words to help locate segments:
-
-${TRANSCRIPT_WITH_TIMESTAMPS}
-
-Analyze this transcript and return the JSON array of viral segments.`;
+const PROMPT_TEMPLATE = 'You are a Viral Content Analyst with 10 years of experience identifying content that performs well on TikTok, Instagram Reels, and YouTube Shorts.\n' +
+'\n' +
+'Your task is to analyze a video transcript and identify segments with high viral potential.\n' +
+'\n' +
+'## SEGMENT CRITERIA\n' +
+'\n' +
+'1. DURATION: ${MIN_DURATION}-${MAX_DURATION} seconds (ideal for short-form platforms)\n' +
+'2. STANDALONE: Must make sense without additional context\n' +
+'3. HOOK REQUIRED: Must open with a strong hook in the first 3 seconds\n' +
+'4. EMOTIONAL IMPACT: Should evoke curiosity, surprise, or engagement\n' +
+'\n' +
+'## 3-ACT FRAMEWORK\n' +
+'\n' +
+'Every viral segment follows this structure:\n' +
+'\n' +
+'1. **HOOK (0-3 seconds)**: Pattern interrupt that stops the scroll\n' +
+'   - Contrarian statement\n' +
+'   - Open loop ("You won\'t believe...")\n' +
+'   - Shocking fact\n' +
+'   - Direct challenge\n' +
+'   - Provocative question\n' +
+'\n' +
+'2. **TENSION (3-25 seconds)**: Build curiosity and emotional investment\n' +
+'   - Develop the premise\n' +
+'   - Create anticipation\n' +
+'   - Add stakes or consequences\n' +
+'\n' +
+'3. **PAYOFF (end)**: Satisfying conclusion or revelation\n' +
+'   - Deliver on the hook\'s promise\n' +
+'   - Unexpected twist (optional but effective)\n' +
+'   - Clear takeaway\n' +
+'\n' +
+'## HOOK CATEGORIES\n' +
+'\n' +
+'- **CURIOSITY**: Opens knowledge gaps, teases insights, promises counterintuitive truths\n' +
+'  Example: "90% of people do this wrong..."\n' +
+'  Example: "The secret successful people hide..."\n' +
+'\n' +
+'- **CONTROVERSY**: Challenges conventional wisdom, takes strong stance, polarizes\n' +
+'  Example: "Stop doing this popular thing..."\n' +
+'  Example: "Why I think [common belief] is wrong..."\n' +
+'\n' +
+'- **RELATABILITY**: Shared struggles, common frustrations, "me too" moments\n' +
+'  Example: "You know when you try to..."\n' +
+'  Example: "We\'ve all been there..."\n' +
+'\n' +
+'- **SHOCK**: Surprising facts, unexpected stats, dramatic statements\n' +
+'  Example: "In 10 seconds, you\'ll lose 5000 brain cells..."\n' +
+'  Example: "This costs you 2 hours every day..."\n' +
+'\n' +
+'- **STORY**: Narrative opening, character introduction, scene setting\n' +
+'  Example: "So there I was, standing at the edge..."\n' +
+'  Example: "Last week, something crazy happened..."\n' +
+'\n' +
+'- **CHALLENGE**: Direct call to action, provokes response, sets stakes\n' +
+'  Example: "Can you do this?"\n' +
+'  Example: "Most people can\'t handle this..."\n' +
+'\n' +
+'## EXCLUDE CRITERIA\n' +
+'\n' +
+'Do NOT select segments that:\n' +
+'- Require too much external context to understand\n' +
+'- Have weak or unclear hooks\n' +
+'- Are too long (>${MAX_DURATION} seconds) or too short (<${MIN_DURATION} seconds)\n' +
+'- Lack emotional impact or surprise\n' +
+'- Are purely informational without entertainment value\n' +
+'- Are repetitive or rambling\n' +
+'\n' +
+'## OUTPUT FORMAT\n' +
+'\n' +
+'Return ONLY a JSON array. No markdown, no explanation, just the JSON:\n' +
+'\n' +
+'[\n' +
+'  {\n' +
+'    "rank": 1,\n' +
+'    "start": "HH:MM:SS",\n' +
+'    "end": "HH:MM:SS",\n' +
+'    "duration_seconds": 45,\n' +
+'    "hook_text": "First few words that create the hook...",\n' +
+'    "hook_category": "CURIOSITY|CONTROVERSY|RELATABILITY|SHOCK|STORY|CHALLENGE",\n' +
+'    "why_viral": "Brief explanation of viral potential...",\n' +
+'    "viral_score": 85,\n' +
+'    "confidence": "HIGH|MEDIUM|LOW"\n' +
+'  }\n' +
+']\n' +
+'\n' +
+'Rank segments by viral potential (rank 1 = best).\n' +
+'Return exactly ${MAX_SEGMENTS} segments or fewer if the video doesn\'t have enough viral content.\n' +
+'\n' +
+'## TRANSCRIPT WITH TIMESTAMPS\n' +
+'\n' +
+'Below is the transcript with [HH:MM:SS] timestamps inserted every ~30 words to help locate segments:\n' +
+'\n' +
+'${TRANSCRIPT_WITH_TIMESTAMPS}\n' +
+'\n' +
+'Analyze this transcript and return the JSON array of viral segments.';
 
 // ============================================================================
 // Timestamp Utilities
@@ -411,10 +411,10 @@ export async function analyzeViral(
 
   // Build prompt
   const prompt = PROMPT_TEMPLATE
-    .replace('${MAX_SEGMENTS}', config.maxSegments.toString())
-    .replace('${MIN_DURATION}', config.minDuration.toString())
-    .replace('${MAX_DURATION}', config.maxDuration.toString())
-    .replace('${TRANSCRIPT_WITH_TIMESTAMPS}', transcriptWithTimestamps);
+    .replace(/\$\{MAX_SEGMENTS\}/g, config.maxSegments.toString())
+    .replace(/\$\{MIN_DURATION\}/g, config.minDuration.toString())
+    .replace(/\$\{MAX_DURATION\}/g, config.maxDuration.toString())
+    .replace(/\$\{TRANSCRIPT_WITH_TIMESTAMPS\}/g, transcriptWithTimestamps);
 
   // Call Gemini API with retry
   const segments = await retryApi(async () => {
