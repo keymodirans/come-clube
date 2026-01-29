@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+dist-cjs/
 
 # AutoCliper config and runtime
 .autocliper/
@@ -19,6 +20,14 @@ pnpm-lock.yaml
 *.mov
 *.avi
 *.mkv
+
+# Standalone binaries
+*.exe
+autocliper-*
+!autocliper (the symlink from npm link)
+
+# Distribution releases
+release/
 
 # Environment
 .env
@@ -47,3 +56,6 @@ yarn-error.log*
 *.temp
 tmp/
 temp/
+
+# pkg cache
+PKG_CACHE_PATH/
