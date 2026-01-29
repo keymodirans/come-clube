@@ -5,17 +5,17 @@
 | Item | Status |
 |------|--------|
 | Repository | C:/Users/Rekabit/Downloads/cli-cliper |
-| GSD | Phase 08 - Props Builder & Storage Complete |
-| Last Activity | 2026-01-30 - Completed 08-PLAN.md |
+| GSD | Phase 07 - Face Detection Complete |
+| Last Activity | 2026-01-29 - Completed 07-PLAN.md |
 
 ---
 
 ## Current Position
 
-**Phase:** 08 of 10 (Props Builder & Storage)
-**Plan:** 08 (Props Builder & Storage) - COMPLETE
+**Phase:** 07 of 10 (Face Detection)
+**Plan:** 07 (Face Detection) - COMPLETE
 **Status:** Phase complete
-**Progress:** ████████████ 88% (7/8 plans total)
+**Progress:** ██████████ 70% (7/10 plans total)
 
 ---
 
@@ -24,7 +24,7 @@
 ### 001: Architecture Confirmation
 **Date:** 2025-01-30
 **Decision:** Hybrid local-cloud architecture confirmed
-- Local CLI handles download, transcription, analysis
+- Local CLI handles download, transcription, analysis, face detection
 - Cloud rendering via GitHub Actions + Remotion
 - Separation allows local processing without heavy GPU requirements
 
@@ -34,6 +34,7 @@
 - @deepgram/sdk ^4.11.3 (v4 only)
 - @google/genai ^1.38.0 (NOT @google/generative-ai)
 - Remotion 4.0.57
+- MediaPipe (optional, via pip)
 
 ### 003: License System
 **Date:** 2025-01-30
@@ -191,6 +192,41 @@
 - Allows inspection of Remotion props before rendering
 - Useful for troubleshooting subtitle sync and crop configuration
 
+### 023: Face Detection Never Blocks Pipeline
+**Date:** 2026-01-29
+**Decision:** Face detection errors must fall back to CENTER mode
+- AutoCliper should work even without Python/MediaPipe
+- All error paths return fallback CENTER results
+- Users see warning but processing continues
+
+### 024: Five-Frame Sampling for Face Detection
+**Date:** 2026-01-29
+**Decision:** Sample 5 frames evenly distributed per segment
+- Balances accuracy with performance
+- Too few samples may miss faces; too many slows processing
+- Interval = total_frames / 5, sample at start + interval * i
+
+### 025: Relative Bounding Box Coordinates
+**Date:** 2026-01-29
+**Decision:** Use relative coordinates (0-1) for bounding boxes
+- Resolution-agnostic, works with any video format
+- MediaPipe provides relative coordinates natively
+- Used by Remotion for split-screen cropping
+
+### 026: MediaPipe Optional Installation
+**Date:** 2026-01-29
+**Decision:** MediaPipe is optional, not required
+- Reduces setup friction
+- Users can enable later if needed
+- autocliper init prompts for MediaPipe but allows skipping
+
+### 027: Multi-Command Python Detection
+**Date:** 2026-01-29
+**Decision:** Try multiple Python commands (python, python3, py)
+- Cross-platform compatibility
+- Windows uses `py`, Unix uses `python3`
+- Loop through commands, use first that succeeds
+
 ---
 
 ## Context Notes
@@ -202,13 +238,14 @@
 4. ALWAYS use cross-platform paths (path + os modules)
 5. Output folder is FIXED: ~/Downloads/autocliper/
 6. HWID must NEVER be logged to console
+7. Face detection is OPTIONAL - fallback to CENTER mode
 
 ### Code Style
 - TypeScript strict mode enabled
 - Target ES2022, Module NodeNext
 - Error format: [E###] Description
 - CLI output: ASCII only, no emoji
-- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription), E030-E039 (analysis), E040-E049 (storage), E050-E059 (post-process)
+- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription), E030-E039 (analysis), E040-E049 (face detection), E050-E059 (props), E060-E069 (GitHub Actions), E070-E079 (post-process)
 
 ### Platform Notes
 - Windows environment requires PowerShell for npm commands
@@ -216,11 +253,13 @@
 - Config stored in ~/.autocliper/device.lock and AppData (conf package default)
 - Tools installed to ~/.autocliper/bin/ with platform-specific extensions
 - Temp files created in os.tmpdir() (platform-specific temp directory)
+- Python commands: `python`, `python3`, `py` (platform-dependent)
 
 ### Tool Installation
 - FFmpeg 7.1 auto-installed from platform-specific sources
 - yt-dlp 2025.10.22 (no Deno) or 2025.11.12+ (with Deno)
 - Deno optional but recommended for full YouTube support
+- MediaPipe optional (pip install mediapipe opencv-python)
 - Download progress displayed via cli-progress bars
 - Executable permissions set automatically on Unix
 
@@ -232,6 +271,8 @@
 - TranscriptResult: transcript, words array, duration, language
 - Gemini AI viral analysis with 3-Act framework
 - ViralSegment: rank, timestamps (HH:MM:SS), hook_category, viral_score, confidence
+- Face detection via Python + MediaPipe (optional)
+- CENTER mode: 1 face, SPLIT mode: 2+ faces with bounding boxes
 - Retry logic with exponential backoff for network operations
 - Temp file cleanup on success/error paths
 
@@ -247,14 +288,15 @@ None
 - **PowerShell Dependency**: Windows builds require PowerShell wrapper - document or find alternative
 - **Config Location**: conf package stores config.json in AppData instead of ~/.autocliper/ (acceptable but inconsistent)
 - **clack/prompts version**: Using 0.10.1 which lacks p.table() - consider upgrade
+- **Python Requirement**: Face detection requires Python + MediaPipe (optional feature)
 
 ---
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 03:17 UTC
-**Stopped At:** Completed 08-PLAN.md (Props Builder & Storage)
-**Resume File:** None (ready for next plan)
+**Last Session:** 2026-01-29 20:15 UTC
+**Stopped At:** Completed 07-PLAN.md (Face Detection)
+**Resume File:** None (ready for next phase)
 
 ---
 
@@ -268,4 +310,4 @@ None
 | 04 | 01 | Video Pipeline (Download + Audio) | .planning/phases/04-video-pipeline/04-01-SUMMARY.md |
 | 05 | 01 | Transcription Service | .planning/phases/05-transcription/05-01-SUMMARY.md |
 | 06 | 06 | Viral Analysis | .planning/phases/06-viral-analysis/06-SUMMARY.md |
-| 08 | 08 | Props Builder & Storage | .planning/phases/08-props-storage/08-SUMMARY.md |
+| 07 | 07 | Face Detection | .planning/phases/07-face-detection/07-07-SUMMARY.md |
