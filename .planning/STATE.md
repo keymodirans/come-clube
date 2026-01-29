@@ -5,17 +5,17 @@
 | Item | Status |
 |------|--------|
 | Repository | C:/Users/Rekabit/Downloads/cli-cliper |
-| GSD | Phase 01 - Foundation Complete |
-| Last Activity | 2026-01-30 - Completed 01-01-PLAN.md |
+| GSD | Phase 02 - License & Config Complete |
+| Last Activity | 2026-01-29 - Completed 02-01-PLAN.md |
 
 ---
 
 ## Current Position
 
-**Phase:** 01 of [unknown] (Foundation)
-**Plan:** 01-01 (Project Foundation) - COMPLETE
+**Phase:** 02 of [unknown] (License & Config)
+**Plan:** 02-01 (License & Config System) - COMPLETE
 **Status:** Phase complete
-**Progress:** ███░░░░░░░ 15% (1/6 plans in Phase 01)
+**Progress:** ██████░░░░ 30% (2/6 plans total)
 
 ---
 
@@ -49,6 +49,20 @@
 - Use: `powershell.exe -Command "npm <command>"`
 - Consider cross-platform npm runner alternative
 
+### 005: ESM CommonJS Interop Pattern
+**Date:** 2026-01-29
+**Decision:** Use createRequire for CommonJS packages in ESM
+- node-machine-id is CommonJS only
+- Pattern: `const require = createRequire(import.meta.url)`
+- Needed for any CommonJS dependencies in ESM project
+
+### 006: License Validation Bypass
+**Date:** 2026-01-29
+**Decision:** Config and hwid commands bypass device validation
+- Allows recovery on device mismatch
+- Users can view device ID and reconfigure without valid license
+- PreAction hook with bypass list pattern
+
 ---
 
 ## Context Notes
@@ -56,19 +70,22 @@
 ### Critical Constraints
 1. NEVER use @google/generative-ai (deprecated, EOL August 2025)
 2. NEVER use Deepgram v3 SDK
-3. ALWAYS use ESM imports (no CommonJS require)
+3. ALWAYS use ESM imports (no CommonJS require unless using createRequire)
 4. ALWAYS use cross-platform paths (path + os modules)
 5. Output folder is FIXED: ~/Downloads/autocliper/
+6. HWID must NEVER be logged to console
 
 ### Code Style
 - TypeScript strict mode enabled
 - Target ES2022, Module NodeNext
 - Error format: [E###] Description
 - CLI output: ASCII only, no emoji
+- Error codes: E001-E009 (license/HWID), E010-E019 (download), E020-E029 (transcription)
 
 ### Platform Notes
 - Windows environment requires PowerShell for npm commands
 - Node v24.13.0 in use (newer than required 20.0.0)
+- Config stored in ~/.autocliper/device.lock and AppData (conf package default)
 
 ---
 
@@ -80,13 +97,14 @@ None
 ### Concerns
 - **Node Version**: Running v24.13.0 vs required 20.0.0 - verify before production
 - **PowerShell Dependency**: Windows builds require PowerShell wrapper - document or find alternative
+- **Config Location**: conf package stores config.json in AppData instead of ~/.autocliper/ (acceptable but inconsistent)
 
 ---
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 02:15 UTC
-**Stopped At:** Completed 01-01-PLAN.md (Project Foundation)
+**Last Session:** 2026-01-29 19:46 UTC
+**Stopped At:** Completed 02-01-PLAN.md (License & Config System)
 **Resume File:** None (ready for next plan)
 
 ---
@@ -96,3 +114,4 @@ None
 | Phase | Plan | Name | Summary |
 |-------|------|------|---------|
 | 01 | 01 | Project Foundation | .planning/phases/01-foundation/01-01-SUMMARY.md |
+| 02 | 01 | License & Config System | .planning/phases/02-license-config/02-01-SUMMARY.md |
