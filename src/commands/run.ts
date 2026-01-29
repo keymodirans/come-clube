@@ -12,7 +12,13 @@ import { log, success, error, blank, separator } from '../utils/logger.js';
 import { downloadVideo, extractAudio, cleanup, isValidYouTubeUrl, checkToolsInstalled } from '../core/downloader.js';
 import { withRetry } from '../utils/retry.js';
 import { transcribe, type TranscriptResult } from '../core/transcriber.js';
-import { analyzeViral, type ViralSegment } from '../core/analyzer.js';
+import { analyzeViral, type ViralSegment, parseTimestamp } from '../core/analyzer.js';
+import { detectFaces, type Segment } from '../core/faceDetector.js';
+import { buildProps, validateAllProps, type FaceDetectionResult } from '../core/propsBuilder.js';
+import { uploadFile } from '../services/storage.js';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
 
 export const runCommand = new Command('run')
   .description('Process a YouTube video and generate viral clips')
@@ -202,10 +208,113 @@ export const runCommand = new Command('run')
       separator();
       log('Analysis complete!');
       blank();
-      log('Next steps (coming in Phase 07):');
-      log('  1. Generate Remotion props JSON');
-      log('  2. Trigger cloud rendering via GitHub Actions');
-      log('  3. Download and post-process rendered clips');
+
+      // Step 5: Face detection using Python + MediaPipe
+      log('> Detecting faces for video layout...');
+      blank();
+
+      // Prepare segments for face detection
+      const segmentsForDetection: Segment[] = analysisResult.segments.map(seg => ({
+        start: seg.start,
+        end: seg.end,
+      }));
+
+      // Run face detection (falls back to CENTER if Python unavailable)
+      const faceDetectionResults = await detectFaces(
+        downloadResult.videoPath,
+        segmentsForDetection,
+        { verbose: true }
+      );
+
+      // Convert to FaceDetectionResult format for props builder
+      const faceDetections: FaceDetectionResult[] = faceDetectionResults.map(result => ({
+        faceCount: result.face_count,
+        cropMode: result.mode,
+        boxes: result.boxes.length > 0 ? result.boxes : undefined,
+      }));
+
+      // Display face detection results
+      blank();
+      success('Face detection complete');
+      blank();
+
+      for (let i = 0; i < faceDetectionResults.length; i++) {
+        const result = faceDetectionResults[i];
+        const segment = analysisResult.segments[i];
+        const modeSymbol = result.mode === 'SPLIT' ? '=' : 'o';
+        log(`  [#${i + 1}] ${segment.hook_text.substring(0, 40)}${segment.hook_text.length > 40 ? '...' : ''}`);
+        log(`  ${modeSymbol} ${result.face_count} face(s) detected -> ${result.mode}`);
+        blank();
+      }
+
+      // Step 6: Upload source video to temporary storage
+      log('> Uploading source video to temporary storage...');
+      blank();
+
+      const uploadResult = await withRetry(
+        () => uploadFile(downloadResult.videoPath),
+        {
+          maxRetries: 3,
+          baseDelayMs: 2000,
+          maxDelayMs: 30000,
+          onRetry: (attempt, err) => {
+            blank();
+            error(`Upload failed (attempt ${attempt}), retrying...`);
+            log(`  Error: ${err.message}`);
+            blank();
+          },
+        }
+      );
+
+      blank();
+      success('Source video uploaded');
+      log(`Download URL: ${uploadResult.link}`);
+      blank();
+
+      // Step 7: Generate Remotion render props
+      log('> Generating Remotion render props...');
+      blank();
+
+      const props = buildProps({
+        videoSrc: uploadResult.link,
+        segments: analysisResult.segments,
+        words: transcriptResult.words,
+        faceDetections,
+      });
+
+      // Validate props
+      validateAllProps(props);
+
+      blank();
+      success(`Generated props for ${props.length} segments`);
+      blank();
+
+      // Display props summary
+      for (let i = 0; i < props.length; i++) {
+        const prop = props[i];
+        log(`  [Segment ${i + 1}] ID: ${prop.id}`);
+        log(`  Duration: ${prop.durationInFrames} frames (${Math.floor(prop.durationInFrames / 30)}s @ ${prop.fps}fps)`);
+        log(`  Video start: ${prop.videoStartTime.toFixed(2)}s`);
+        log(`  Crop mode: ${prop.cropMode}`);
+        log(`  Words: ${prop.words.length} words for subtitles`);
+        log(`  Hook text: ${prop.hookText.substring(0, 40)}${prop.hookText.length > 40 ? '...' : ''}`);
+        blank();
+      }
+
+      // Optionally save props to file for debugging
+      const debugDir = path.join(os.tmpdir(), 'autocliper-debug');
+      await fs.ensureDir(debugDir);
+      const propsPath = path.join(debugDir, `props-${Date.now()}.json`);
+      await fs.writeJSON(propsPath, props, { spaces: 2 });
+      log(`Debug: Props saved to ${propsPath}`);
+      blank();
+
+      separator();
+      log('Props generation complete!');
+      blank();
+      log('Next steps (coming in Phase 08):');
+      log('  1. Trigger cloud rendering via GitHub Actions');
+      log('  2. Download and post-process rendered clips');
       separator();
       blank();
 
