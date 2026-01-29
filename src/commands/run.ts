@@ -12,6 +12,7 @@ import { log, success, error, blank, separator } from '../utils/logger.js';
 import { downloadVideo, extractAudio, cleanup, isValidYouTubeUrl, checkToolsInstalled } from '../core/downloader.js';
 import { withRetry } from '../utils/retry.js';
 import { transcribe, type TranscriptResult } from '../core/transcriber.js';
+import { analyzeViral, type ViralSegment } from '../core/analyzer.js';
 
 export const runCommand = new Command('run')
   .description('Process a YouTube video and generate viral clips')
@@ -160,15 +161,51 @@ export const runCommand = new Command('run')
       log(`Duration: ${Math.floor(transcriptResult.duration / 60)}:${Math.floor(transcriptResult.duration % 60).toString().padStart(2, '0')}`);
       blank();
 
-      // TODO: Continue with viral segment detection in Phase 06
-      separator();
-      log('Transcription complete!');
+      // Step 4: Analyze for viral segments using Gemini
+      log('> Analyzing with Gemini...');
       blank();
-      log('Next steps (coming in Phase 06):');
-      log('  1. Detect viral segments using Gemini');
-      log('  2. Generate Remotion props JSON');
-      log('  3. Trigger cloud rendering via GitHub Actions');
-      log('  4. Download and post-process rendered clips');
+      log(`Model: gemini-2.5-flash`);
+      log(`Max segments: ${options.max}`);
+      blank();
+
+      const maxSegments = parseInt(options.max || '3', 10);
+      const analysisResult = await withRetry(
+        () => analyzeViral(transcriptResult.words, {
+          maxSegments,
+          language: options.language,
+        }),
+        {
+          maxRetries: 3,
+          baseDelayMs: 1000,
+          maxDelayMs: 30000,
+          onRetry: (attempt, err) => {
+            blank();
+            error(`Analysis failed (attempt ${attempt}), retrying...`);
+            log(`  Error: ${err.message}`);
+            blank();
+          },
+        }
+      );
+
+      blank();
+      success(`Found ${analysisResult.segments.length} viral segments`);
+      blank();
+
+      // Display each segment
+      for (const segment of analysisResult.segments) {
+        log(`  [#${segment.rank}] ${segment.hook_text.substring(0, 50)}${segment.hook_text.length > 50 ? '...' : ''}`);
+        log(`  ${segment.start} - ${segment.end} (${segment.duration_seconds}s)`);
+        log(`  Category: ${segment.hook_category} | Score: ${segment.viral_score}/100 | Confidence: ${segment.confidence}`);
+        blank();
+      }
+
+      separator();
+      log('Analysis complete!');
+      blank();
+      log('Next steps (coming in Phase 07):');
+      log('  1. Generate Remotion props JSON');
+      log('  2. Trigger cloud rendering via GitHub Actions');
+      log('  3. Download and post-process rendered clips');
       separator();
       blank();
 
