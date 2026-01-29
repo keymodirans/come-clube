@@ -100,7 +100,7 @@ export async function runCli(): Promise<void> {
 
 // Allow direct execution for testing
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runCli().catch((err) => {
+  runCli().catch(() => {
     // Already logged by checkLicense, just exit
     process.exit(1);
   });
