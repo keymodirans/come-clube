@@ -174,7 +174,7 @@ Create standalone binaries for distribution.
 
 | Phase | Name | Status | Progress |
 |-------|------|--------|----------|
-| 01 | Project Foundation | \u25cb | 0% |
+| 01 | Project Foundation | \u2713 | 100% |
 | 02 | License & Config | \u25cb | 0% |
 | 03 | External Tools Installer | \u25cb | 0% |
 | 04 | Video Pipeline | \u25cb | 0% |
