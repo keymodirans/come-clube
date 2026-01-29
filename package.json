@@ -11,11 +11,11 @@
   },
   "scripts": {
     "build": "tsup",
-    "build:cjs": "tsup --format cjs --out-dir dist-cjs --target node16",
     "dev": "tsup --watch",
-    "pkg:win": "npm run build:cjs && pkg dist-cjs/index.js -t node16-win-x64 -o dist/autocliper-win.exe",
-    "pkg:mac": "npm run build:cjs && pkg dist-cjs/index.js -t node16-macos-x64 -o dist/autocliper-macos",
-    "pkg:linux": "npm run build:cjs && pkg dist-cjs/index.js -t node16-linux-x64 -o dist/autocliper-linux",
+    "prepack": "npm run build",
+    "pkg:win": "pkg dist/index.js -t node22-win-x64 -o dist/autocliper-win.exe",
+    "pkg:mac": "pkg dist/index.js -t node22-macos-x64 -o dist/autocliper-macos",
+    "pkg:linux": "pkg dist/index.js -t node22-linux-x64 -o dist/autocliper-linux",
     "pkg:all": "npm run pkg:win && npm run pkg:mac && npm run pkg:linux",
     "hwid": "node bin/cli.js hwid"
   },

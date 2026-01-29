@@ -1,0 +1,54 @@
+# Source files
+src/
+tsconfig.json
+tsup.config.ts
+*.ts
+
+# Build artifacts (dist/ is included, but source maps excluded)
+!dist/
+*.js.map
+*.d.ts.map
+
+# Documentation
+docs/
+Docs/
+*.md
+!README.md
+
+# Planning
+.planning/
+
+# Development
+.node_modules/
+.npm/
+.DS_Store
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.env
+.env.*
+
+# Video files (testing artifacts)
+*.mp4
+*.wav
+*.mp3
+
+# Lock files (use package-lock.json)
+*.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test coverage
+coverage/
+.nyc_output/

@@ -419,12 +419,13 @@ export const runCommand = new Command('run')
         log(`Monitoring job ${job.jobId} (${segment.hook_text.substring(0, 30)}...)`);
 
         try {
+          const startTime = Date.now();
           const finalStatus = await githubService.pollUntilComplete(
             job.runId!,
             (status) => {
               // Progress callback
               const statusSymbol = status.status === 'queued' ? '-' : '>';
-              const elapsed = Math.floor((Date.now() - Date.now()) / 1000);
+              const elapsed = Math.floor((Date.now() - startTime) / 1000);
               log(`  ${statusSymbol} ${status.status}${status.conclusion ? ` -> ${status.conclusion}` : ''}`);
             },
             30 * 60 * 1000 // 30 minutes
