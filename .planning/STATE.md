@@ -5,17 +5,17 @@
 | Item | Status |
 |------|--------|
 | Repository | C:/Users/Rekabit/Downloads/cli-cliper |
-| GSD | Phase 04 - Video Pipeline Complete |
-| Last Activity | 2026-01-30 - Completed 04-01-PLAN.md |
+| GSD | Phase 05 - Transcription Service Complete |
+| Last Activity | 2026-01-30 - Completed 05-01-PLAN.md |
 
 ---
 
 ## Current Position
 
-**Phase:** 04 of [unknown] (Video Pipeline)
-**Plan:** 04-01 (Video Pipeline - Download + Audio) - COMPLETE
+**Phase:** 05 of 10 (Transcription Service)
+**Plan:** 05-01 (Transcription Service - Deepgram Nova-3) - COMPLETE
 **Status:** Phase complete
-**Progress:** █████████░ 53% (4/6 plans total)
+**Progress:** ██████████ 67% (5/6 plans total)
 
 ---
 
@@ -116,6 +116,35 @@
 - Ignore ENOENT errors in cleanup (file may already be deleted)
 - Use os.tmpdir() for cross-platform temp directory
 
+### 014: Deepgram v4 SDK Only
+**Date:** 2026-01-30
+**Decision:** Use @deepgram/sdk v4 createClient() pattern exclusively
+- Import: `import { createClient } from '@deepgram/sdk'`
+- FORBIDDEN: v3 `new Deepgram()` pattern (deprecated, EOL August 2025)
+- Client: `const deepgram = createClient(apiKey)`
+- API: `deepgram.listen.prerecorded.transcribeFile(audioBuffer, options)`
+
+### 015: 16kHz Mono Audio for Deepgram
+**Date:** 2026-01-30
+**Decision:** Audio extraction uses 16kHz sample rate and mono channel
+- Deepgram API requires 16kHz for optimal transcription
+- PCM 16-bit little-endian codec for WAV compatibility
+- Already configured in Phase 04 audio extraction
+
+### 016: Word-Level Timestamps Required
+**Date:** 2026-01-30
+**Decision:** Transcription must include word-level timestamps
+- Each word has start/end seconds for subtitle sync
+- Word interface: word, start, end, confidence, punctuated_word
+- Essential for Remotion subtitle synchronization
+
+### 017: Indonesian Default Language
+**Date:** 2026-01-30
+**Decision:** Primary language set to Indonesian ('id')
+- Target audience: Indonesia
+- Configurable via preferences.language
+- English ('en') also supported
+
 ---
 
 ## Context Notes
@@ -133,7 +162,7 @@
 - Target ES2022, Module NodeNext
 - Error format: [E###] Description
 - CLI output: ASCII only, no emoji
-- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription)
+- Error codes: E001-E009 (license/HWID), E010-E019 (download/install), E020-E029 (transcription), E030-E039 (analysis)
 
 ### Platform Notes
 - Windows environment requires PowerShell for npm commands
@@ -153,6 +182,8 @@
 - YouTube download via yt-dlp with progress tracking
 - Audio extraction to WAV (16kHz mono) for Deepgram
 - FFmpeg used for audio extraction with pcm_s16le codec
+- Deepgram Nova-3 transcription with word-level timestamps
+- TranscriptResult: transcript, words array, duration, language
 - Retry logic with exponential backoff for network operations
 - Temp file cleanup on success/error paths
 
@@ -173,8 +204,8 @@ None
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 02:46 UTC
-**Stopped At:** Completed 04-01-PLAN.md (Video Pipeline - Download + Audio)
+**Last Session:** 2026-01-30 02:55 UTC
+**Stopped At:** Completed 05-01-PLAN.md (Transcription Service)
 **Resume File:** None (ready for next plan)
 
 ---
@@ -187,3 +218,4 @@ None
 | 02 | 01 | License & Config System | .planning/phases/02-license-config/02-01-SUMMARY.md |
 | 03 | 01 | External Tools Installer | .planning/phases/03-installer/03-01-SUMMARY.md |
 | 04 | 01 | Video Pipeline (Download + Audio) | .planning/phases/04-video-pipeline/04-01-SUMMARY.md |
+| 05 | 01 | Transcription Service | .planning/phases/05-transcription/05-01-SUMMARY.md |
