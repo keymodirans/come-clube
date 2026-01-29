@@ -9,6 +9,9 @@ import { request } from 'undici';
 import { retryApi } from '../utils/retry.js';
 import { nanoid } from 'nanoid';
 import type { SegmentProps } from '../core/propsBuilder.js';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
 
 // ============================================================================
 // Interfaces
@@ -294,7 +297,6 @@ export class GitHubService {
       }
 
       // Return the first artifact's download URL
-      // Note: This URL requires authentication, will be used in Phase 10
       return data.artifacts[0].archive_download_url;
     } catch (err) {
       const error = err as Error;
@@ -305,6 +307,141 @@ export class GitHubService {
 
       throw new Error(`${GITHUB_ERROR_CODES.API_ERROR}: Failed to get artifacts: ${error.message}`);
     }
+  }
+
+  /**
+   * Download artifact from workflow run
+   * @param runId - Workflow run ID
+   * @param artifactName - Optional artifact name (downloads first if not specified)
+   * @returns Downloaded file path
+   * @throws Error with [E066] on download failure
+   */
+  async downloadArtifact(runId: number, artifactName?: string): Promise<string> {
+    // Get artifact URL with authentication token
+    const artifactUrl = await this.getArtifactUrl(runId);
+
+    // Append token for authentication
+    const authenticatedUrl = `${artifactUrl}?access_token=${this.config.token}`;
+
+    // Create temp directory for downloads
+    const outputDir = path.join(os.tmpdir(), 'autocliper-artifacts');
+    await fs.ensureDir(outputDir);
+
+    // Generate output path
+    const filename = artifactName || `artifact-${runId}-${Date.now()}.zip`;
+    const outputPath = path.join(outputDir, filename);
+
+    try {
+      // Download with retry
+      const response = await retryApi(
+        () => request(authenticatedUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${this.config.token}`,
+            'User-Agent': 'AutoCliper-CLI',
+          },
+          timeout: 10 * 60 * 1000, // 10 minutes
+        }),
+        'Artifact download',
+        {
+          maxRetries: 3,
+          baseDelayMs: 2000,
+          maxDelayMs: 30000,
+        }
+      );
+
+      // Stream to file
+      const fileStream = fs.createWriteStream(outputPath);
+      const reader = response.body;
+
+      await new Promise<void>((resolve, reject) => {
+        reader.on('data', (chunk: Buffer) => {
+          fileStream.write(chunk);
+        });
+        reader.on('end', () => {
+          fileStream.end();
+          resolve();
+        });
+        reader.on('error', reject);
+        fileStream.on('error', reject);
+      });
+
+      // Verify file exists
+      if (!fs.existsSync(outputPath)) {
+        throw new Error(`${GITHUB_ERROR_CODES.DOWNLOAD_FAILED}: Output file not created`);
+      }
+
+      return outputPath;
+    } catch (err) {
+      const error = err as Error;
+
+      // Re-throw our custom errors
+      if (error.message.startsWith('[E06')) {
+        throw error;
+      }
+
+      // Wrap other errors
+      throw new Error(`${GITHUB_ERROR_CODES.DOWNLOAD_FAILED}: ${error.message}`);
+    }
+  }
+
+  /**
+   * List all artifacts for a workflow run
+   * @param runId - Workflow run ID
+   * @returns Array of artifact info
+   */
+  async listArtifacts(runId: number): Promise<Array<{ id: number; name: string; size: number }>> {
+    const url = `${API_BASE}/repos/${this.config.owner}/${this.config.repo}/actions/runs/${runId}/artifacts`;
+
+    try {
+      const response = await request(url, {
+        method: 'GET',
+        headers: this.headers,
+        timeout: 10000,
+      });
+
+      const data = await response.body.json();
+
+      if (!data.artifacts) {
+        return [];
+      }
+
+      return data.artifacts.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        size: a.size_in_bytes,
+      }));
+    } catch (err) {
+      const error = err as Error;
+
+      if (error.message.startsWith('[E06')) {
+        throw error;
+      }
+
+      throw new Error(`${GITHUB_ERROR_CODES.API_ERROR}: Failed to list artifacts: ${error.message}`);
+    }
+  }
+
+  /**
+   * Download all artifacts from a workflow run
+   * @param runId - Workflow run ID
+   * @returns Array of downloaded file paths
+   */
+  async downloadAllArtifacts(runId: number): Promise<string[]> {
+    const artifacts = await this.listArtifacts(runId);
+
+    if (artifacts.length === 0) {
+      return [];
+    }
+
+    const results: string[] = [];
+
+    for (const artifact of artifacts) {
+      const filePath = await this.downloadArtifact(runId, artifact.name);
+      results.push(filePath);
+    }
+
+    return results;
   }
 
   // ========================================================================
