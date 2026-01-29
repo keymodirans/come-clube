@@ -5,17 +5,17 @@
 | Item | Status |
 |------|--------|
 | Repository | C:/Users/Rekabit/Downloads/cli-cliper |
-| GSD | Phase 07 - Face Detection Complete |
-| Last Activity | 2026-01-29 - Completed 07-PLAN.md |
+| GSD | Phase 09 - GitHub Integration Complete |
+| Last Activity | 2026-01-30 - Completed 09-PLAN.md |
 
 ---
 
 ## Current Position
 
-**Phase:** 07 of 10 (Face Detection)
-**Plan:** 07 (Face Detection) - COMPLETE
+**Phase:** 09 of 10 (GitHub Integration)
+**Plan:** 09 (GitHub Integration) - COMPLETE
 **Status:** Phase complete
-**Progress:** ██████████ 70% (7/10 plans total)
+**Progress:** ██████████ 90% (9/10 plans total)
 
 ---
 
@@ -227,6 +227,38 @@
 - Windows uses `py`, Unix uses `python3`
 - Loop through commands, use first that succeeds
 
+### 028: GitHub Actions Polling Interval
+**Date:** 2026-01-30
+**Decision:** 10-second polling interval for workflow status checks
+- Balances API rate limits (5000 requests/hour)
+- Provides reasonably responsive progress updates
+- Sufficient for render workflows that take 2-10 minutes
+
+### 029: GitHub Actions Timeout
+**Date:** 2026-01-30
+**Decision:** 30-minute timeout for workflow polling
+- Sufficient for rendering multiple 3-minute clips at 1080p
+- GitHub Actions has 6-hour job timeout, 30min is conservative
+- Prevents indefinite hangs on workflow failures
+
+### 030: Concurrent Job Limit
+**Date:** 2026-01-30
+**Decision:** Limit to 2 concurrent render jobs
+- Matches GitHub Actions free tier limit (20 concurrent jobs total)
+- Additional jobs queue until active jobs complete
+- Prevents API rate limit issues
+
+### 031: GitHub Error Code Range [E060-E069]
+**Date:** 2026-01-30
+**Decision:** Dedicated error code range for GitHub Actions
+- E060: Failed to trigger workflow
+- E061: Workflow run not found
+- E062: Render timeout exceeded
+- E063: Invalid GitHub configuration
+- E064: GitHub API error
+- E065: Artifact not found
+- E066-E069: Reserved for future GitHub integration features
+
 ---
 
 ## Context Notes
@@ -294,8 +326,8 @@ None
 
 ## Session Continuity
 
-**Last Session:** 2026-01-29 20:15 UTC
-**Stopped At:** Completed 07-PLAN.md (Face Detection)
+**Last Session:** 2026-01-30 03:17 UTC
+**Stopped At:** Completed 09-PLAN.md (GitHub Integration)
 **Resume File:** None (ready for next phase)
 
 ---
@@ -311,3 +343,5 @@ None
 | 05 | 01 | Transcription Service | .planning/phases/05-transcription/05-01-SUMMARY.md |
 | 06 | 06 | Viral Analysis | .planning/phases/06-viral-analysis/06-SUMMARY.md |
 | 07 | 07 | Face Detection | .planning/phases/07-face-detection/07-07-SUMMARY.md |
+| 08 | 08 | Props Generation | .planning/phases/08-props-generation/08-08-SUMMARY.md |
+| 09 | 09 | GitHub Integration | .planning/phases/09-github-integration/09-09-SUMMARY.md |
