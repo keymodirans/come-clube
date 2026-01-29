@@ -6,7 +6,7 @@
  */
 
 import { Command } from 'commander';
-import { hasApiKeys } from '../utils/config.js';
+import { hasApiKeys, get } from '../utils/config.js';
 import { ERROR_CODES } from '../license/validator.js';
 import { log, success, error, blank, separator } from '../utils/logger.js';
 import { downloadVideo, extractAudio, cleanup, isValidYouTubeUrl, checkToolsInstalled } from '../core/downloader.js';
@@ -14,8 +14,10 @@ import { withRetry } from '../utils/retry.js';
 import { transcribe, type TranscriptResult } from '../core/transcriber.js';
 import { analyzeViral, type ViralSegment, parseTimestamp } from '../core/analyzer.js';
 import { detectFaces, type Segment } from '../core/faceDetector.js';
-import { buildProps, validateAllProps, type FaceDetectionResult } from '../core/propsBuilder.js';
+import { buildProps, validateAllProps, type FaceDetectionResult, type SegmentProps } from '../core/propsBuilder.js';
 import { uploadFile } from '../services/storage.js';
+import { GitHubService, generateJobId, type GitHubConfig, type WorkflowRun } from '../services/github.js';
+import type { UploadResult } from '../services/storage.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
@@ -312,10 +314,151 @@ export const runCommand = new Command('run')
       separator();
       log('Props generation complete!');
       blank();
-      log('Next steps (coming in Phase 08):');
-      log('  1. Trigger cloud rendering via GitHub Actions');
-      log('  2. Download and post-process rendered clips');
+
+      // Step 8: Trigger cloud rendering via GitHub Actions
+      log('> Triggering cloud rendering via GitHub Actions...');
+      blank();
+
+      // Load GitHub configuration
+      const githubConfig: GitHubConfig = {
+        token: get<string>('api.github.token') || '',
+        owner: get<string>('api.github.owner') || '',
+        repo: get<string>('api.github.repo') || '',
+      };
+
+      const githubService = new GitHubService(githubConfig);
+
+      // Track all rendering jobs
+      const renderJobs: Array<{
+        jobId: string;
+        segmentIndex: number;
+        runId?: number;
+        status?: WorkflowRun;
+      }> = [];
+
+      // Trigger render jobs (limit to 2 concurrent)
+      const MAX_CONCURRENT = 2;
+      for (let i = 0; i < props.length; i++) {
+        // Check concurrent limit
+        const activeJobs = renderJobs.filter(j => !j.status || j.status.status !== 'completed').length;
+        if (activeJobs >= MAX_CONCURRENT) {
+          log(`Waiting for active jobs to complete... (${activeJobs}/${MAX_CONCURRENT} running)`);
+          blank();
+        }
+
+        const prop = props[i];
+        const jobId = generateJobId();
+
+        log(`[Job ${i + 1}/${props.length}] Triggering render for segment ${prop.id}...`);
+        log(`  Job ID: ${jobId}`);
+
+        try {
+          // Trigger the workflow
+          const runId = await withRetry(
+            () => githubService.triggerRender({
+              jobId,
+              videoUrl: uploadResult.link,
+              props: prop,
+            }),
+            {
+              maxRetries: 3,
+              baseDelayMs: 2000,
+              maxDelayMs: 15000,
+              onRetry: (attempt, err) => {
+                log(`  Retrying trigger (attempt ${attempt})...`);
+              },
+            }
+          );
+
+          if (!runId) {
+            throw new Error('Failed to get workflow run ID');
+          }
+
+          renderJobs.push({
+            jobId,
+            segmentIndex: i,
+            runId,
+          });
+
+          log(`  Workflow run ID: ${runId}`);
+          success(`Job ${jobId} queued`);
+          blank();
+
+        } catch (err) {
+          const errorObj = err as Error;
+          error(`Failed to trigger render job: ${errorObj.message}`);
+          renderJobs.push({
+            jobId,
+            segmentIndex: i,
+            status: {
+              id: 0,
+              status: 'completed',
+              conclusion: 'failure',
+              url: '',
+            },
+          });
+        }
+      }
+
       separator();
+      log('All render jobs triggered');
+      blank();
+      log('--- Monitoring ---');
+      blank();
+
+      // Monitor all jobs until completion
+      const completedJobs = new Set<number>();
+
+      for (const job of renderJobs) {
+        if (job.status?.status === 'completed') {
+          continue; // Skip failed triggers
+        }
+
+        const segment = analysisResult.segments[job.segmentIndex];
+        log(`Monitoring job ${job.jobId} (${segment.hook_text.substring(0, 30)}...)`);
+
+        try {
+          const finalStatus = await githubService.pollUntilComplete(
+            job.runId!,
+            (status) => {
+              // Progress callback
+              const statusSymbol = status.status === 'queued' ? '-' : '>';
+              const elapsed = Math.floor((Date.now() - Date.now()) / 1000);
+              log(`  ${statusSymbol} ${status.status}${status.conclusion ? ` -> ${status.conclusion}` : ''}`);
+            },
+            30 * 60 * 1000 // 30 minutes
+          );
+
+          job.status = finalStatus;
+          completedJobs.add(job.segmentIndex);
+
+          if (finalStatus.conclusion === 'success') {
+            success(`Job ${job.jobId} completed`);
+            log(`  URL: ${finalStatus.url}`);
+          } else {
+            error(`Job ${job.jobId} failed: ${finalStatus.conclusion}`);
+            log(`  URL: ${finalStatus.url}`);
+          }
+        } catch (err) {
+          const errorObj = err as Error;
+          error(`Job ${job.jobId} error: ${errorObj.message}`);
+        }
+
+        blank();
+      }
+
+      separator();
+      log(`Rendering complete: ${completedJobs.size}/${props.length} jobs successful`);
+      blank();
+
+      // Display final status
+      for (let i = 0; i < renderJobs.length; i++) {
+        const job = renderJobs[i];
+        const segment = analysisResult.segments[i];
+        const symbol = job.status?.conclusion === 'success' ? '+' : 'x';
+        log(`  ${symbol} [${i + 1}] ${segment.hook_text.substring(0, 40)}${segment.hook_text.length > 40 ? '...' : ''}`);
+        log(`    Job: ${job.jobId} | Status: ${job.status?.conclusion || 'unknown'}`);
+      }
       blank();
 
       // Cleanup temp files
