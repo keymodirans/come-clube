@@ -9,7 +9,11 @@ import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import { machineIdSync } from 'node-machine-id';
+import { createRequire } from 'module';
+
+// node-machine-id is CommonJS, use createRequire
+const require = createRequire(import.meta.url);
+const machineIdModule = require('node-machine-id');
 
 /**
  * Secret salt for HWID generation
@@ -42,7 +46,7 @@ export function getLockFilePath(): string {
  */
 function getRawMachineId(): string {
   try {
-    return machineIdSync();
+    return machineIdModule.machineIdSync();
   } catch (err) {
     // Fallback to platform-specific IDs if machineIdSync fails
     const hostname = os.hostname();
