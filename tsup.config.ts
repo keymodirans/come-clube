@@ -7,6 +7,11 @@ export default defineConfig({
   platform: 'node',
   outDir: 'dist',
   clean: true,
+  minify: true,
+  shims: true,
   sourcemap: true,
   dts: true,
+  banner: {
+    js: '#!/usr/bin/env node',
+  },
 });

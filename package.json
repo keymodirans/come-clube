@@ -12,6 +12,10 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "pkg:win": "pkg dist/index.js -t node22-win-x64 -o dist/autocliper-win.exe",
+    "pkg:mac": "pkg dist/index.js -t node22-macos-x64 -o dist/autocliper-macos",
+    "pkg:linux": "pkg dist/index.js -t node22-linux-x64 -o dist/autocliper-linux",
+    "pkg:all": "npm run pkg:win && npm run pkg:mac && npm run pkg:linux",
     "hwid": "node bin/cli.js hwid"
   },
   "keywords": [
@@ -46,6 +50,12 @@
     "@types/fs-extra": "^11.0.4",
     "@types/cli-progress": "^3.11.6",
     "typescript": "^5.7.2",
-    "tsup": "^8.3.6"
+    "tsup": "^8.3.6",
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": ["scripts/**/*"],
+    "outputPath": "dist",
+    "scripts": ["dist/**/*.js"]
   }
 }

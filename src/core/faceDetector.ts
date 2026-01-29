@@ -83,8 +83,31 @@ export interface FaceDetectionOptions {
 // Constants
 // ============================================================================
 
+/**
+ * Get the path to the Python face detector script
+ *
+ * When running as a standalone binary (pkg), the script is extracted
+ * next to the executable. When running from source, it's in scripts/.
+ *
+ * @returns Path to face_detector.py
+ */
+function getScriptPath(): string {
+  // Check if running as pkg bundled executable
+  const isPkg = typeof process.pkg !== 'undefined' && process.pkg !== null;
+
+  if (isPkg) {
+    // When bundled, script is extracted next to executable
+    // process.pkg.entrypoint is the entry point path
+    const execDir = path.dirname(process.execPath);
+    return path.join(execDir, 'scripts', 'face_detector.py');
+  }
+
+  // When running from source (development), use process.cwd()
+  return path.join(process.cwd(), 'scripts', 'face_detector.py');
+}
+
 /** Path to Python face detector script */
-const SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'face_detector.py');
+const SCRIPT_PATH = getScriptPath();
 
 /** Error codes for face detection */
 const ERROR_CODES = {
