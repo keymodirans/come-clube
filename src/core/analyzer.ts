@@ -282,7 +282,7 @@ function parseJsonResponse(responseText: string): ViralSegment[] {
     // Remove first line (```json or ```)
     lines.shift();
     // Remove last line if it's closing ```
-    if (lines[lines.length - 1].trim() === '```') {
+    if (lines[lines.length - 1]?.trim() === '```') {
       lines.pop();
     }
     cleanedText = lines.join('\n').trim();
