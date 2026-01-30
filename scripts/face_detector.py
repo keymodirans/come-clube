@@ -20,9 +20,18 @@ Output:
 import sys
 import json
 import cv2
-import mediapipe as mp
 from pathlib import Path
 from typing import List, Dict, Tuple
+
+# MediaPipe compatibility - handle both old and new versions
+try:
+    # MediaPipe 0.10.x+
+    from mediapipe import solutions
+    mp_face_detection = solutions.face_detection
+except (ImportError, AttributeError):
+    # Fallback for older versions
+    import mediapipe as mp
+    mp_face_detection = mp.solutions.face_detection
 
 
 # ============================================================================
@@ -93,7 +102,6 @@ def detect_faces_in_segment(
         face_counts = []
 
         # Initialize MediaPipe Face Detection
-        mp_face_detection = mp.solutions.face_detection
         face_detection = mp_face_detection.FaceDetection(
             model_selection=MODEL_SELECTION,
             min_detection_confidence=MIN_DETECTION_CONFIDENCE
@@ -190,7 +198,6 @@ def get_face_boxes(
         height, width = frame.shape[:2]
 
         # Initialize MediaPipe Face Detection
-        mp_face_detection = mp.solutions.face_detection
         face_detection = mp_face_detection.FaceDetection(
             model_selection=MODEL_SELECTION,
             min_detection_confidence=MIN_DETECTION_CONFIDENCE
