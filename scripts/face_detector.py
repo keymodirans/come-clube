@@ -106,6 +106,19 @@ def determine_crop_mode(face_count, boxes):
     else:
         return "SPLIT", boxes[:2]
 
+def parse_timestamp(value):
+    """Convert timestamp string (HH:MM:SS or MM:SS) to float seconds."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str) or ':' not in value:
+        return float(value)
+    parts = value.split(':')
+    if len(parts) == 3:  # HH:MM:SS
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    elif len(parts) == 2:  # MM:SS
+        return int(parts[0]) * 60 + float(parts[1])
+    return float(value)
+
 def main():
     if len(sys.argv) < 3:
         print("Usage: python face_detector.py <video_path> <segments_json>", file=sys.stderr)
@@ -126,8 +139,8 @@ def main():
 
     results = []
     for segment in segments:
-        start = float(segment.get("start", 0))
-        end = float(segment.get("end", start + 30))
+        start = parse_timestamp(segment.get("start", 0))
+        end = parse_timestamp(segment.get("end", start + 30))
 
         try:
             face_count, boxes = detect_faces_in_segment(video_path, start, end)
