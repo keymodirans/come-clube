@@ -420,13 +420,15 @@ export async function analyzeViral(
   const segments = await retryApi(async () => {
     try {
       const ai = new GoogleGenAI({ apiKey });
+      // Try gemini-2.5-flash first (may have different quota than 2.5-flash)
+      // Falls back to gemini-2.5-flash if experimental model unavailable
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           temperature: 0.3,
           topP: 0.8,
-          maxOutputTokens: 4096,
+          maxOutputTokens: 8192,
         },
       });
 

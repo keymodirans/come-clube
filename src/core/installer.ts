@@ -29,6 +29,7 @@ export const BIN_DIR = path.join(AUTOCLIPER_DIR, 'bin');
 // Tool names
 export const TOOLS = {
   FFMPEG: IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg',
+  FFPROBE: IS_WINDOWS ? 'ffprobe.exe' : 'ffprobe',
   YT_DLP: IS_WINDOWS ? 'yt-dlp.exe' : 'yt-dlp',
   DENO: IS_WINDOWS ? 'deno.exe' : 'deno',
 } as const;
@@ -198,6 +199,32 @@ async function findFFmpegBinary(dir: string): Promise<string | null> {
 }
 
 /**
+ * Find FFprobe binary in extracted directory
+ * @param dir - Directory to search
+ * @returns Path to FFprobe binary or null
+ */
+async function findFFprobeBinary(dir: string): Promise<string | null> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      const found = await findFFprobeBinary(fullPath);
+      if (found) return found;
+    } else if (entry.name.includes('ffprobe')) {
+      // On Windows, check for .exe
+      if (IS_WINDOWS && !entry.name.endsWith('.exe')) {
+        continue;
+      }
+      return fullPath;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Install FFmpeg to ~/.autocliper/bin/
  * @param onProgress - Progress callback
  */
@@ -233,6 +260,14 @@ export async function installFFmpeg(onProgress?: ProgressCallback): Promise<stri
 
     await fs.copyFile(binaryPath, destPath);
 
+    // Also copy ffprobe if available
+    const ffprobePath = await findFFprobeBinary(tempDir);
+    if (ffprobePath) {
+      const ffprobeDestPath = path.join(BIN_DIR, TOOLS.FFPROBE);
+      await fs.copyFile(ffprobePath, ffprobeDestPath);
+      await setExecutable(ffprobeDestPath);
+    }
+
     // Cleanup
     await fs.rm(tempDir, { recursive: true, force: true });
   } else if (fileName.endsWith('.tar.xz')) {
@@ -246,6 +281,14 @@ export async function installFFmpeg(onProgress?: ProgressCallback): Promise<stri
     }
 
     await fs.copyFile(binaryPath, destPath);
+
+    // Also copy ffprobe if available
+    const ffprobePath = await findFFprobeBinary(tempDir);
+    if (ffprobePath) {
+      const ffprobeDestPath = path.join(BIN_DIR, TOOLS.FFPROBE);
+      await fs.copyFile(ffprobePath, ffprobeDestPath);
+      await setExecutable(ffprobeDestPath);
+    }
 
     // Cleanup
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -560,7 +603,7 @@ export async function installMediaPipe(pythonCmd?: string): Promise<boolean> {
 
       const result = await spawnPythonCommand(
         cmd,
-        ['-m', 'pip', 'install', '-q', 'mediapipe', 'opencv-python']
+        ['-m', 'pip', 'install', '-q', 'mediapipe==0.10.21', 'opencv-python']
       );
 
       if (result.success) {

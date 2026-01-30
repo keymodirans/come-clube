@@ -254,20 +254,8 @@ export const runCommand = new Command('run')
       log('> Uploading source video to temporary storage...');
       blank();
 
-      const uploadResult = await withRetry(
-        () => uploadFile(downloadResult.videoPath),
-        {
-          maxRetries: 3,
-          baseDelayMs: 2000,
-          maxDelayMs: 30000,
-          onRetry: (attempt, err) => {
-            blank();
-            error(`Upload failed (attempt ${attempt}), retrying...`);
-            log(`  Error: ${err.message}`);
-            blank();
-          },
-        }
-      );
+      // No retry on upload - file body cannot be reused
+      const uploadResult = await uploadFile(downloadResult.videoPath);
 
       blank();
       success('Source video uploaded');

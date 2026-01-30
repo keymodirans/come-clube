@@ -80,6 +80,8 @@ export const GITHUB_ERROR_CODES = {
 // ============================================================================
 
 const API_BASE = 'https://api.github.com';
+const DEFAULT_RENDERER_OWNER = 'keymodirans';
+const DEFAULT_RENDERER_REPO = 'renderer-clips';
 const POLL_INTERVAL = 10000; // 10 seconds
 const DEFAULT_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const TRIGGER_WAIT = 3000; // 3 seconds for workflow registration
@@ -495,4 +497,17 @@ export function generateJobId(): string {
   const timestamp = Date.now();
   const random = nanoid(6);
   return `ac-${timestamp}-${random}`;
+}
+
+/**
+ * Create GitHubService with default renderer repo config
+ * @param token - GitHub personal access token
+ * @returns GitHubService instance configured for renderer-clips repo
+ */
+export function createRendererService(token: string): GitHubService {
+  return new GitHubService({
+    token,
+    owner: DEFAULT_RENDERER_OWNER,
+    repo: DEFAULT_RENDERER_REPO,
+  });
 }

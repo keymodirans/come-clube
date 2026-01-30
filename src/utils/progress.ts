@@ -5,7 +5,10 @@
  * ASCII only output (no emoji).
  */
 
-import createProgressBar, { ProgressBar } from 'cli-progress';
+import { SingleBar, Presets } from 'cli-progress';
+
+// Type alias for the progress bar instance
+export type ProgressBar = SingleBar;
 
 /**
  * Progress bar options
@@ -24,7 +27,7 @@ export interface ProgressOptions {
  * @param options - Progress bar options
  * @returns Progress bar instance
  */
-export function createProgressBar(options: ProgressOptions = {}): ProgressBar {
+export function createProgressBar(options: ProgressOptions = {}): SingleBar {
   const {
     title = '',
     total = 100,
@@ -34,7 +37,7 @@ export function createProgressBar(options: ProgressOptions = {}): ProgressBar {
   // Default format: [=========>] 45% | 28MB/62MB
   const defaultFormat = `${title ? title + ' ' : ''}[{bar}] {percentage}% | {value}/{total}`;
 
-  return createProgressBar.create({
+  const bar = new SingleBar({
     format: format || defaultFormat,
     barCompleteChar: '=',
     barIncompleteChar: '-',
@@ -42,8 +45,10 @@ export function createProgressBar(options: ProgressOptions = {}): ProgressBar {
     clearOnComplete: true,
     stopOnComplete: true,
     barsize: 40,
-    autoptracing: true,
-  }, total);
+  }, Presets.shades_grey);
+
+  bar.start(total, 0);
+  return bar;
 }
 
 /**
@@ -52,7 +57,7 @@ export function createProgressBar(options: ProgressOptions = {}): ProgressBar {
  * @param totalBytes - Total bytes to download
  * @returns Progress bar instance
  */
-export function createDownloadProgress(title: string, totalBytes: number): ProgressBar {
+export function createDownloadProgress(title: string, totalBytes: number): SingleBar {
   return createProgressBar({
     title,
     total: totalBytes,

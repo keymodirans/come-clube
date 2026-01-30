@@ -50,17 +50,16 @@ npm run pkg:all              # Build all platforms
     +-- FFmpeg: Extract audio (WAV)
     +-- Deepgram API: Transcription + word timestamps
     +-- Gemini API: Viral segment detection
-    +-- FFmpeg: Extract sample frames per segment
-    +-- Face count analysis (simple heuristic)
+    +-- Python MediaPipe: Face detection for layout (CENTER vs SPLIT)
     +-- Generate Remotion props JSON
-    +-- Upload source video to temp storage
+    +-- Upload source video to temp storage (file.io)
     +-- Trigger GitHub Actions
     |
     v
 [GITHUB ACTIONS]
     |
     +-- Download source video
-    +-- Render with Remotion
+    +-- Render with Remotion (9:16 vertical video)
     +-- Upload result to temp storage
     +-- Webhook callback
     |
@@ -102,11 +101,12 @@ npm run pkg:all              # Build all platforms
 ```
 
 **Version Notes (updated 2025-01-30):**
-- commander: Updated to ^14.0.0 (latest stable, ESM only)
-- chalk: Updated to ^5.6.0 (latest stable, ESM only)
-- ora: Updated to ^9.1.0 (latest stable)
-- @deepgram/sdk: Locked at ^4.11.3 (v5 is beta, use v4 for stability)
+- commander: ^14.0.0 (latest stable, ESM only)
+- chalk: ^5.6.0 (latest stable, ESM only)
+- ora: ^9.1.0 (latest stable)
+- @deepgram/sdk: ^4.11.3 (v5 is beta, use v4 for stability)
 - @google/genai: ^1.38.0 (correct package - NOT @google/generative-ai)
+- undici: ^7.3.0 (HTTP client for GitHub API, fetch-native)
 
 ### External Tools (Auto-installed via `autocliper init`)
 - **FFmpeg** 7.1 - from github.com/BtbN/FFmpeg-Builds
@@ -114,7 +114,9 @@ npm run pkg:all              # Build all platforms
   - **IMPORTANT:** yt-dlp 2025.11.12+ requires Deno runtime for YouTube support
   - Installer will offer to install Deno if not detected
   - Fallback: pin to yt-dlp 2025.10.22 (last version without Deno requirement)
-- **Python MediaPipe** (optional) - via pip for face detection
+- **Python + MediaPipe** (optional) - via pip for face detection
+  - Uses opencv-python and mediapipe packages
+  - Falls back to CENTER layout if unavailable
 
 ---
 
@@ -159,20 +161,7 @@ autocliper/
 └── tsup.config.ts
 ```
 
-**Implementation Status (as of 2025-01-30):**
-- Phase 01: Foundation - DONE
-- Phase 02: License & Config - DONE
-- Phase 03: Installer - DONE
-- Phase 04: Video Pipeline - DONE (downloader.ts)
-- Phase 05: Transcription - DONE (transcriber.ts)
-- Phase 06: Viral Analysis - DONE (analyzer.ts)
-- Phase 07: Face Detection - DONE (faceDetector.ts)
-- Phase 08: Props & Storage - DONE (propsBuilder.ts, storage.ts)
-- Phase 09: GitHub Integration - DONE (github.ts)
-- Phase 10: Post-Processing - DONE (postProcess.ts)
-- Phase 11: Build & Packaging - DONE (pkg scripts, tsup config)
-
-**All 11 phases are FULLY IMPLEMENTED.**
+**All 11 phases are FULLY IMPLEMENTED as of 2025-01-30.**
 
 ---
 
@@ -187,12 +176,6 @@ autocliper run <url> --max 3 # Limit number of segments
 autocliper run <url> -l en   # Specify language (id, en)
 autocliper hwid              # Show device ID and license status
 ```
-
-**Command Implementation Status:**
-- `init`: FULLY IMPLEMENTED - Downloads and installs FFmpeg, yt-dlp, optionally Deno
-- `config`: FULLY IMPLEMENTED - Interactive setup for Deepgram, Gemini, GitHub
-- `hwid`: FULLY IMPLEMENTED - Shows device ID and validates license
-- `run`: FULLY IMPLEMENTED - Complete pipeline: download → transcribe → analyze → render → download
 
 ---
 
@@ -225,6 +208,22 @@ const response = await ai.models.generateContent({
   model: 'gemini-2.5-flash',  // or gemini-2.0-flash
   contents: prompt,
   config: { temperature: 0.3, topP: 0.8, maxOutputTokens: 4096 }
+});
+```
+
+### GitHub Actions API (uses undici, not fetch)
+```typescript
+import { request } from 'undici';
+
+const response = await request(url, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'AutoCliper-CLI',
+  },
+  body: JSON.stringify(payload),
 });
 ```
 
@@ -285,8 +284,9 @@ Error code ranges:
 - E010-E019: Download
 - E020-E029: Transcription
 - E030-E039: Analysis
-- E040-E049: Rendering
+- E040-E049: Rendering/Face Detection
 - E050-E059: Post-process
+- E060-E069: GitHub Integration
 
 ---
 
@@ -299,6 +299,20 @@ The Gemini analyzer uses a 3-Act framework:
 3. **PAYOFF (end)**: Satisfying conclusion
 
 Hook categories: CURIOSITY, CONTROVERSY, RELATABILITY, SHOCK, STORY, CHALLENGE
+
+---
+
+## Face Detection & Video Layout
+
+Face detection determines the video crop mode:
+
+- **CENTER** (0-1 faces): Single speaker, center crop
+- **SPLIT** (2+ faces): Split screen layout for interviews/conversations
+
+The Python script (`scripts/face_detector.py`) is called from `faceDetector.ts` and:
+1. Samples 5 frames evenly across each segment
+2. Uses MediaPipe FaceDetection with model_selection=1 (full-range)
+3. Returns mode of face counts + bounding boxes for SPLIT layout
 
 ---
 
@@ -326,26 +340,7 @@ const configDir = path.join(os.homedir(), '.autocliper');
 7. NEVER use `eval()` or dynamic code execution
 8. NEVER disable TypeScript strict mode
 9. NEVER import CommonJS modules directly - use `createRequire` for CJS deps like `node-machine-id`
-
----
-
-## External Documentation
-
-| Service | URL |
-|---------|-----|
-| Deepgram | developers.deepgram.com |
-| Gemini | ai.google.dev/gemini-api |
-| Remotion | remotion.dev/docs |
-| yt-dlp | github.com/yt-dlp/yt-dlp |
-
----
-
-## Models Used
-
-| Service | Model |
-|---------|-------|
-| Deepgram | nova-3 |
-| Gemini | gemini-2.0-flash or gemini-2.5-flash |
+10. NEVER use `fetch` directly - use `undici` `request()` for HTTP (Node compatibility)
 
 ---
 
@@ -389,23 +384,55 @@ import { getToolPath, TOOLS } from '../core/installer.js';
 const ffmpegPath = getToolPath(TOOLS.FFMPEG);
 ```
 
+### Retry Logic
+
+Two retry utilities are available:
+- `withRetry()` from `utils/retry.ts` - Generic exponential backoff wrapper
+- `retryApi()` from `utils/retry.ts` - Pre-configured for API calls with logging
+
+Always use retry wrappers for:
+- Deepgram API calls
+- Gemini API calls
+- GitHub API calls (also has internal retry via `retryApi` in `github.ts`)
+
 ### Run Command Flow (All 11 Steps)
 
 The `run` command in `src/commands/run.ts` orchestrates the complete pipeline:
 
 1. **Validate URL** - Check if YouTube URL is valid
 2. **Download Video** - Use yt-dlp to download video
-3. **Extract Audio** - Use FFmpeg to extract WAV for Deepgram
+3. **Extract Audio** - Use FFmpeg to extract WAV for Deepgram (16kHz, mono)
 4. **Transcribe** - Call Deepgram Nova-3 for word timestamps
-5. **Analyze Viral** - Call Gemini for viral segment detection
-6. **Face Detection** - Use Python MediaPipe for layout determination
+5. **Analyze Viral** - Call Gemini for viral segment detection (3-Act framework)
+6. **Face Detection** - Use Python MediaPipe for layout determination (CENTER/SPLIT)
 7. **Upload Video** - Upload to temporary storage (file.io)
-8. **Build Props** - Generate Remotion render props JSON
-9. **Trigger Render** - Call GitHub Actions for each segment
-10. **Poll Jobs** - Monitor workflow completion (30min timeout)
+8. **Build Props** - Generate Remotion render props JSON with face detection data
+9. **Trigger Render** - Call GitHub Actions for each segment (max 2 concurrent)
+10. **Poll Jobs** - Monitor workflow completion (30min timeout per job)
 11. **Download & Post-Process** - Download artifacts, randomize metadata
 
 All steps include retry logic with exponential backoff.
+
+---
+
+## External Documentation
+
+| Service | URL |
+|---------|-----|
+| Deepgram | developers.deepgram.com |
+| Gemini | ai.google.dev/gemini-api |
+| Remotion | remotion.dev/docs |
+| yt-dlp | github.com/yt-dlp/yt-dlp |
+| undici | github.com/nodejs/undici |
+
+---
+
+## Models Used
+
+| Service | Model |
+|---------|-------|
+| Deepgram | nova-3 |
+| Gemini | gemini-2.0-flash or gemini-2.5-flash |
 
 ---
 
@@ -426,5 +453,6 @@ All steps include retry logic with exponential backoff.
 | `src/services/storage.ts` | File upload to temporary storage (file.io) |
 | `src/services/github.ts` | GitHub Actions workflow trigger & polling |
 | `src/services/postProcess.ts` | Video metadata randomization |
+| `scripts/face_detector.py` | Standalone Python script for face detection |
 | `.planning/REQUIREMENTS.md` | Complete functional requirements |
 | `.planning/phases/*/PLAN.md` | Individual phase implementation plans |

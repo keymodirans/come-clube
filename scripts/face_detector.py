@@ -264,13 +264,17 @@ def main():
 
     for i, segment in enumerate(segments):
         start = segment.get('start', 0)
-        end = segment.get('end', start + 30)
+        end = segment.get('end', None)
 
         # Convert timestamp strings (HH:MM:SS) to seconds if needed
         if isinstance(start, str) and ':' in start:
             parts = start.split(':')
             start = int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
-        if isinstance(end, str) and ':' in end:
+
+        # Default end to start + 30 seconds if not provided
+        if end is None:
+            end = start + 30
+        elif isinstance(end, str) and ':' in end:
             parts = end.split(':')
             end = int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
 

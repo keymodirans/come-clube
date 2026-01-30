@@ -3,10 +3,12 @@
  *
  * Handles uploading source videos to temporary file hosting services
  * for cloud rendering via GitHub Actions.
+ *
+ * Uses 0x0.st - no authentication required, privacy-focused
  */
 
 import fs from 'fs-extra';
-import { request } from 'undici';
+import { execSync } from 'child_process';
 import { retryApi } from '../utils/retry.js';
 
 // ============================================================================
@@ -61,17 +63,14 @@ const DEFAULT_CONFIG: Required<StorageConfig> = {
 // ============================================================================
 
 /**
- * Upload a file to temporary storage using file.io
+ * Upload a file to temporary storage using 0x0.st
  *
- * file.io provides free temporary file hosting with:
- * - 100 files/day limit on free tier
- * - Automatic expiration (default: 1 day)
- * - Direct download links
+ * 0x0.st provides free temporary file hosting with:
  * - No authentication required
- *
- * Fallback services (if file.io fails):
- * - transfer.sh (14-day expiration, no auth)
- * - tempfile.io (similar to file.io)
+ * - Privacy-focused service
+ * - Direct download links
+ * - Large file support
+ * - Automatic expiration
  *
  * @param filePath - Path to file to upload
  * @param config - Storage configuration options
@@ -114,9 +113,10 @@ export async function uploadFile(
     throw new Error(`${STORAGE_ERROR_CODES.FILE_NOT_FOUND}: Failed to read file: ${error.message}`);
   }
 
-  // Upload with retry logic
+  // Upload with retry logic (for temporary network issues)
+  // Note: 0x0.st allows retries as we're creating a new request each time
   return await retryApi(
-    () => uploadToFileIo(fileBuffer, filePath, finalConfig.timeout),
+    () => uploadToZeroX0St(fileBuffer, filePath, finalConfig.timeout),
     'File upload',
     {
       maxRetries: 3,
@@ -127,76 +127,56 @@ export async function uploadFile(
 }
 
 /**
- * Upload file to file.io service
+ * Upload file to 0x0.st service
  * @param buffer - File content as buffer
  * @param filename - Original filename for content-type hint
  * @param timeout - Request timeout in milliseconds
  * @returns UploadResult with download link
  * @throws Error with [E04x] codes on failure
  */
-async function uploadToFileIo(
+async function uploadToZeroX0St(
   buffer: Buffer,
   filename: string,
   timeout: number
 ): Promise<UploadResult> {
-  const FILE_IO_URL = 'https://file.io';
+  const ZERO_X0_URL = 'https://0x0.st';
 
   try {
-    // Determine content type based on file extension
-    const ext = filename.split('.').pop()?.toLowerCase() || '';
-    const contentType = getContentType(ext);
+    // Get basename for the file
     const basename = filename.split(/[\\/]/).pop() || 'video.mp4';
 
-    // Create multipart form data boundary
-    const boundary = `----FormDataBoundary${Date.now()}`;
+    // Create temp file for curl upload
+    const tmpDir = process.env.TMPDIR || process.env.TEMP || '/tmp';
+    const tmpPath = `${tmpDir}/${basename}-${Date.now()}`;
+    await fs.writeFile(tmpPath, buffer);
 
-    // Build the multipart form data properly
-    // Note: We need to construct the body as a buffer with proper encoding
-    const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${basename}"\r\nContent-Type: ${contentType}\r\n\r\n`;
-    const footer = `\r\n--${boundary}--\r\n`;
-
-    // Concatenate header + buffer + footer
-    const headerBuffer = Buffer.from(header, 'utf8');
-    const footerBuffer = Buffer.from(footer, 'utf8');
-    const bodyBuffer = Buffer.concat([headerBuffer, buffer, footerBuffer]);
-
-    // Make POST request to file.io
-    const response = await request(FILE_IO_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      },
-      body: bodyBuffer,
-      timeout,
-    });
-
-    // Parse response
-    let responseData: any;
     try {
-      responseData = await response.body.json();
-    } catch (parseError) {
-      const responseText = await response.body.text();
-      throw new Error(`${STORAGE_ERROR_CODES.INVALID_RESPONSE}: ${responseText.substring(0, 200)}`);
-    }
+      // Use curl to upload (0x0.st blocks Node.js fetch but allows curl)
+      const timeoutSec = Math.floor(timeout / 1000);
+      const curlResult = execSync(
+        `curl -s -m ${timeoutSec} -F "file=@${tmpPath}" ${ZERO_X0_URL}`,
+        {
+          encoding: 'utf-8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout,
+        }
+      );
 
-    // Validate response structure
-    if (!responseData || typeof responseData !== 'object') {
-      throw new Error(`${STORAGE_ERROR_CODES.INVALID_RESPONSE}: Response is not an object`);
-    }
+      const link = curlResult.trim();
 
-    if (!responseData.success) {
-      throw new Error(`${STORAGE_ERROR_CODES.UPLOAD_FAILED}: ${responseData.message || 'Unknown error'}`);
-    }
+      // Validate response
+      if (!link || !link.startsWith('http')) {
+        throw new Error(`${STORAGE_ERROR_CODES.INVALID_RESPONSE}: Response is not a valid URL: ${link.substring(0, 100)}`);
+      }
 
-    if (!responseData.link || typeof responseData.link !== 'string') {
-      throw new Error(`${STORAGE_ERROR_CODES.INVALID_RESPONSE}: Missing or invalid 'link' field`);
-    }
+      return {
+        link: link,
+      };
 
-    return {
-      link: responseData.link,
-      key: responseData.key,
-      expiry: responseData.expiry,
-    };
+    } finally {
+      // Cleanup temp file
+      await fs.unlink(tmpPath).catch(() => {});
+    }
 
   } catch (err) {
     const error = err as Error;
@@ -207,8 +187,13 @@ async function uploadToFileIo(
     }
 
     // Handle timeout errors
-    if (error.message.includes('timeout') || error.name === 'TimeoutError') {
+    if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
       throw new Error(STORAGE_ERROR_CODES.TIMEOUT);
+    }
+
+    // Handle curl errors
+    if (error.message.includes('curl')) {
+      throw new Error(`${STORAGE_ERROR_CODES.UPLOAD_FAILED}: ${error.message}`);
     }
 
     // Wrap other errors
@@ -218,10 +203,11 @@ async function uploadToFileIo(
 
 /**
  * Get content type for file extension
- * @param ext - File extension
+ * @param filename - File name or extension
  * @returns Content type string
  */
-function getContentType(ext: string): string {
+function getContentType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
   const contentTypes: Record<string, string> = {
     mp4: 'video/mp4',
     webm: 'video/webm',
@@ -237,31 +223,97 @@ function getContentType(ext: string): string {
 // ============================================================================
 
 /**
- * Upload to transfer.sh as fallback
+ * Upload to litterbox.catbox.moe as fallback
  * @param buffer - File content
  * @param filename - Original filename
+ * @param timeout - Request timeout
  * @returns UploadResult with download link
  */
-async function uploadToTransferSh(buffer: Buffer, filename: string): Promise<UploadResult> {
-  const TRANSFER_SH_URL = 'https://transfer.sh';
+async function uploadToLitterbox(
+  buffer: Buffer,
+  filename: string,
+  timeout: number
+): Promise<UploadResult> {
+  const LITTERBOX_URL = 'https://litterbox.catbox.moe/resources/internals/api.php';
 
   try {
-    const response = await request(`${TRANSFER_SH_URL}/${filename}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-      },
-      body: buffer,
-      timeout: 60000, // 1 minute
+    const basename = filename.split(/[\\/]/).pop() || 'video.mp4';
+
+    // Create FormData for litterbox
+    const formData = new FormData();
+    const blob = new Blob([buffer], { type: getContentType(basename) });
+    formData.append('fileToUpload', blob, basename);
+    formData.append('reqtype', 'fileupload');
+    formData.append('time', '24h'); // 24 hour expiration
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    const response = await fetch(LITTERBOX_URL, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
     });
 
-    const link = await response.body.text();
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const link = await response.text();
 
     if (!link || !link.startsWith('http')) {
       throw new Error(`${STORAGE_ERROR_CODES.INVALID_RESPONSE}: Invalid download link`);
     }
 
-    return { link };
+    return { link: link.trim() };
+  } catch (err) {
+    const error = err as Error;
+    throw new Error(`${STORAGE_ERROR_CODES.UPLOAD_FAILED}: ${error.message}`);
+  }
+}
+
+/**
+ * Upload to transfer.sh as fallback
+ * @param buffer - File content
+ * @param filename - Original filename
+ * @param timeout - Request timeout
+ * @returns UploadResult with download link
+ */
+async function uploadToTransferSh(
+  buffer: Buffer,
+  filename: string,
+  timeout: number
+): Promise<UploadResult> {
+  const TRANSFER_SH_URL = 'https://transfer.sh';
+
+  try {
+    const basename = filename.split(/[\\/]/).pop() || 'video.mp4';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    // transfer.sh uses PUT request with the filename in the URL
+    const response = await fetch(`${TRANSFER_SH_URL}/${basename}`, {
+      method: 'PUT',
+      body: buffer,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const link = await response.text();
+
+    if (!link || !link.startsWith('http')) {
+      throw new Error(`${STORAGE_ERROR_CODES.INVALID_RESPONSE}: Invalid download link`);
+    }
+
+    return { link: link.trim() };
   } catch (err) {
     const error = err as Error;
     throw new Error(`${STORAGE_ERROR_CODES.UPLOAD_FAILED}: ${error.message}`);

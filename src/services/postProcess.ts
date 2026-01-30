@@ -14,7 +14,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs-extra';
 import { spawn } from 'child_process';
-import { getToolPath } from '../core/installer.js';
+import { getToolPath, TOOLS } from '../core/installer.js';
 import type { ViralSegment } from '../core/analyzer.js';
 
 // ============================================================================
@@ -349,7 +349,7 @@ export async function postProcess(options: PostProcessOptions): Promise<string> 
   const creationTime = randDate();
 
   // FFmpeg path
-  const ffmpegPath = getToolPath('ffmpeg') || 'ffmpeg';
+  const ffmpegPath = getToolPath(TOOLS.FFMPEG) || 'ffmpeg';
 
   return new Promise<string>((resolve, reject) => {
     const args = [

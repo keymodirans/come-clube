@@ -10,7 +10,7 @@ import os from 'os';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
-import { getToolPath } from './installer.js';
+import { getToolPath, TOOLS } from './installer.js';
 import { createDownloadProgress, Spinner } from '../utils/progress.js';
 import { log, success, error } from '../utils/logger.js';
 
@@ -104,7 +104,7 @@ export async function getFileSize(filePath: string): Promise<number> {
  * @returns Duration in seconds
  */
 export async function getVideoDuration(videoPath: string): Promise<number> {
-  const ffprobePath = getToolPath('ffprobe') || 'ffprobe';
+  const ffprobePath = getToolPath(TOOLS.FFPROBE) || 'ffprobe';
 
   return new Promise<number>((resolve, reject) => {
     const ffprobe = spawn(ffprobePath, [
@@ -145,8 +145,8 @@ export async function getVideoDuration(videoPath: string): Promise<number> {
  * @returns true if tools are available
  */
 export function checkToolsInstalled(): { ffmpeg: boolean; ytdlp: boolean } {
-  const ffmpegPath = getToolPath('ffmpeg');
-  const ytdlpPath = getToolPath('yt-dlp');
+  const ffmpegPath = getToolPath(TOOLS.FFMPEG);
+  const ytdlpPath = getToolPath(TOOLS.YT_DLP);
 
   return {
     ffmpeg: existsSync(ffmpegPath),
@@ -227,7 +227,7 @@ export async function downloadVideo(
   log('Downloading video...');
 
   return new Promise<DownloadResult>((resolve, reject) => {
-    const ytdlpPath = getToolPath('yt-dlp');
+    const ytdlpPath = getToolPath(TOOLS.YT_DLP);
     const args = [
       '-f', 'best', // Best quality
       '-o', outputPath, // Output file
@@ -331,7 +331,7 @@ export async function extractAudio(
   if (spinner) spinner.start();
 
   return new Promise<AudioExtractionResult>((resolve, reject) => {
-    const ffmpegPath = getToolPath('ffmpeg');
+    const ffmpegPath = getToolPath(TOOLS.FFMPEG);
 
     const args = [
       '-i', input,
