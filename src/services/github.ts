@@ -1,8 +1,5 @@
 /**
  * GitHub Service - Trigger and monitor GitHub Actions for cloud rendering
- *
- * Handles repository_dispatch events, workflow polling, and artifact retrieval
- * for Remotion-based video rendering via GitHub Actions.
  */
 
 import { request } from 'undici';
@@ -12,52 +9,33 @@ import type { SegmentProps } from '../core/propsBuilder.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { createReadStream } from 'fs';
+// @ts-ignore - unzip-stream is CommonJS
+import unzip from 'unzip-stream';
 
 // ============================================================================
 // Interfaces
 // ============================================================================
 
-/**
- * GitHub service configuration
- */
 export interface GitHubConfig {
-  /** GitHub personal access token */
   token: string;
-  /** Repository owner (username or organization) */
   owner: string;
-  /** Repository name */
   repo: string;
 }
 
-/**
- * Job payload for repository_dispatch event
- */
 export interface JobPayload {
-  /** Unique job identifier */
   jobId: string;
-  /** Download URL for source video */
   videoUrl: string;
-  /** Remotion render props for this segment */
   props: SegmentProps;
 }
 
-/**
- * Workflow run status from GitHub API
- */
 export interface WorkflowRun {
-  /** Run ID */
   id: number;
-  /** Run status */
   status: 'queued' | 'in_progress' | 'completed';
-  /** Run conclusion (null if not completed) */
   conclusion: 'success' | 'failure' | 'cancelled' | null;
-  /** Run URL */
   url: string;
 }
 
-/**
- * Workflow run progress callback
- */
 export type ProgressCallback = (status: WorkflowRun) => void;
 
 // ============================================================================
@@ -82,32 +60,21 @@ export const GITHUB_ERROR_CODES = {
 const API_BASE = 'https://api.github.com';
 const DEFAULT_RENDERER_OWNER = 'keymodirans';
 const DEFAULT_RENDERER_REPO = 'renderer-clips';
-const POLL_INTERVAL = 10000; // 10 seconds
-const DEFAULT_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-const TRIGGER_WAIT = 3000; // 3 seconds for workflow registration
+const POLL_INTERVAL = 10000;
+const DEFAULT_TIMEOUT = 30 * 60 * 1000;
+const TRIGGER_WAIT = 3000;
 
 // ============================================================================
 // GitHubService Class
 // ============================================================================
 
-/**
- * GitHub Service for Actions workflow management
- *
- * Provides methods to trigger rendering workflows, poll for completion,
- * and retrieve artifacts from GitHub Actions.
- */
 export class GitHubService {
   private readonly headers: Record<string, string>;
   private readonly config: GitHubConfig;
 
-  /**
-   * Create a new GitHubService instance
-   * @param config - GitHub configuration
-   */
   constructor(config: GitHubConfig) {
     this.config = config;
 
-    // Validate configuration
     if (!config.token || !config.owner || !config.repo) {
       throw new Error(`${GITHUB_ERROR_CODES.INVALID_CONFIG}: Missing token, owner, or repo`);
     }
@@ -120,31 +87,17 @@ export class GitHubService {
     };
   }
 
-  /**
-   * Trigger a render workflow via repository_dispatch
-   * @param payload - Job payload with jobId, videoUrl, props
-   * @returns Run ID if successful, undefined otherwise
-   * @throws Error with [E060] on trigger failure
-   */
   async triggerRender(payload: JobPayload): Promise<number | undefined> {
     const url = `${API_BASE}/repos/${this.config.owner}/${this.config.repo}/dispatches`;
 
     try {
-      // Trigger the workflow
       await retryApi(
         () => this.sendDispatch(url, payload),
         'Workflow trigger',
-        {
-          maxRetries: 3,
-          baseDelayMs: 2000,
-          maxDelayMs: 10000,
-        }
+        { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 10000 }
       );
 
-      // Wait for workflow to register
       await this.sleep(TRIGGER_WAIT);
-
-      // Find the triggered workflow run
       const runId = await this.findLatestRunId();
 
       if (!runId) {
@@ -154,22 +107,11 @@ export class GitHubService {
       return runId;
     } catch (err) {
       const error = err as Error;
-
-      // Re-throw our custom errors
-      if (error.message.startsWith('[E06')) {
-        throw error;
-      }
-
-      // Wrap other errors
+      if (error.message.startsWith('[E06')) throw error;
       throw new Error(`${GITHUB_ERROR_CODES.TRIGGER_FAILED}: ${error.message}`);
     }
   }
 
-  /**
-   * Find the latest workflow run ID
-   * @returns Run ID or undefined if no runs found
-   * @throws Error with [E061] if run not found
-   */
   async findLatestRunId(): Promise<number | undefined> {
     const url = `${API_BASE}/repos/${this.config.owner}/${this.config.repo}/actions/runs?per_page=1`;
 
@@ -177,10 +119,10 @@ export class GitHubService {
       const response = await request(url, {
         method: 'GET',
         headers: this.headers,
-        timeout: 10000,
+        signal: AbortSignal.timeout(10000),
       });
 
-      const data = await response.body.json();
+      const data = await response.body.json() as any;
 
       if (!data.workflow_runs || data.workflow_runs.length === 0) {
         return undefined;
@@ -189,21 +131,11 @@ export class GitHubService {
       return data.workflow_runs[0].id;
     } catch (err) {
       const error = err as Error;
-
-      if (error.message.startsWith('[E06')) {
-        throw error;
-      }
-
+      if (error.message.startsWith('[E06')) throw error;
       throw new Error(`${GITHUB_ERROR_CODES.API_ERROR}: Failed to list runs: ${error.message}`);
     }
   }
 
-  /**
-   * Get the status of a workflow run
-   * @param runId - Workflow run ID
-   * @returns WorkflowRun with current status
-   * @throws Error with [E061] if run not found
-   */
   async getRunStatus(runId: number): Promise<WorkflowRun> {
     const url = `${API_BASE}/repos/${this.config.owner}/${this.config.repo}/actions/runs/${runId}`;
 
@@ -211,14 +143,14 @@ export class GitHubService {
       const response = await request(url, {
         method: 'GET',
         headers: this.headers,
-        timeout: 10000,
+        signal: AbortSignal.timeout(10000),
       });
 
       if (response.statusCode === 404) {
         throw new Error(`${GITHUB_ERROR_CODES.RUN_NOT_FOUND}: Run ${runId} not found`);
       }
 
-      const data = await response.body.json();
+      const data = await response.body.json() as any;
 
       return {
         id: data.id,
@@ -228,23 +160,11 @@ export class GitHubService {
       };
     } catch (err) {
       const error = err as Error;
-
-      if (error.message.startsWith('[E06')) {
-        throw error;
-      }
-
+      if (error.message.startsWith('[E06')) throw error;
       throw new Error(`${GITHUB_ERROR_CODES.API_ERROR}: Failed to get run status: ${error.message}`);
     }
   }
 
-  /**
-   * Poll a workflow run until completion
-   * @param runId - Workflow run ID
-   * @param onProgress - Optional callback for status updates
-   * @param timeout - Timeout in milliseconds (default: 30 minutes)
-   * @returns Final WorkflowRun when complete
-   * @throws Error with [E062] on timeout
-   */
   async pollUntilComplete(
     runId: number,
     onProgress?: ProgressCallback,
@@ -253,35 +173,24 @@ export class GitHubService {
     const startTime = Date.now();
 
     while (true) {
-      // Check timeout
       if (Date.now() - startTime > timeout) {
         throw new Error(`${GITHUB_ERROR_CODES.TIMEOUT}: Workflow ${runId} exceeded ${timeout}ms timeout`);
       }
 
-      // Get current status
       const status = await this.getRunStatus(runId);
 
-      // Report progress
       if (onProgress) {
         onProgress(status);
       }
 
-      // Check if complete
       if (status.status === 'completed') {
         return status;
       }
 
-      // Wait before next poll
       await this.sleep(POLL_INTERVAL);
     }
   }
 
-  /**
-   * Get artifact download URL for a completed run
-   * @param runId - Workflow run ID
-   * @returns Artifact download URL
-   * @throws Error with [E065] if artifact not found
-   */
   async getArtifactUrl(runId: number): Promise<string> {
     const url = `${API_BASE}/repos/${this.config.owner}/${this.config.repo}/actions/runs/${runId}/artifacts`;
 
@@ -289,109 +198,115 @@ export class GitHubService {
       const response = await request(url, {
         method: 'GET',
         headers: this.headers,
-        timeout: 10000,
+        signal: AbortSignal.timeout(10000),
       });
 
-      const data = await response.body.json();
+      const data = await response.body.json() as any;
 
       if (!data.artifacts || data.artifacts.length === 0) {
         throw new Error(`${GITHUB_ERROR_CODES.ARTIFACT_NOT_FOUND}: No artifacts found for run ${runId}`);
       }
 
-      // Return the first artifact's download URL
       return data.artifacts[0].archive_download_url;
     } catch (err) {
       const error = err as Error;
-
-      if (error.message.startsWith('[E06')) {
-        throw error;
-      }
-
+      if (error.message.startsWith('[E06')) throw error;
       throw new Error(`${GITHUB_ERROR_CODES.API_ERROR}: Failed to get artifacts: ${error.message}`);
     }
   }
 
   /**
-   * Download artifact from workflow run
-   * @param runId - Workflow run ID
-   * @param artifactName - Optional artifact name (downloads first if not specified)
-   * @returns Downloaded file path
-   * @throws Error with [E066] on download failure
+   * Download and extract artifact ZIP from workflow run
    */
-  async downloadArtifact(runId: number, artifactName?: string): Promise<string> {
-    // Get artifact URL with authentication token
+  async downloadArtifact(runId: number, outputDir?: string): Promise<string> {
     const artifactUrl = await this.getArtifactUrl(runId);
 
-    // Append token for authentication
-    const authenticatedUrl = `${artifactUrl}?access_token=${this.config.token}`;
+    // Create temp directory
+    const tempDir = path.join(os.tmpdir(), `autocliper-artifact-${runId}-${Date.now()}`);
+    await fs.ensureDir(tempDir);
 
-    // Create temp directory for downloads
-    const outputDir = path.join(os.tmpdir(), 'autocliper-artifacts');
-    await fs.ensureDir(outputDir);
-
-    // Generate output path
-    const filename = artifactName || `artifact-${runId}-${Date.now()}.zip`;
-    const outputPath = path.join(outputDir, filename);
+    const zipPath = path.join(tempDir, 'artifact.zip');
+    const extractDir = path.join(tempDir, 'extracted');
+    await fs.ensureDir(extractDir);
 
     try {
-      // Download with retry
-      const response = await retryApi(
-        () => request(authenticatedUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${this.config.token}`,
-            'User-Agent': 'AutoCliper-CLI',
-          },
-          timeout: 10 * 60 * 1000, // 10 minutes
-        }),
-        'Artifact download',
-        {
-          maxRetries: 3,
-          baseDelayMs: 2000,
-          maxDelayMs: 30000,
-        }
-      );
-
-      // Stream to file
-      const fileStream = fs.createWriteStream(outputPath);
-      const reader = response.body;
-
-      await new Promise<void>((resolve, reject) => {
-        reader.on('data', (chunk: Buffer) => {
-          fileStream.write(chunk);
-        });
-        reader.on('end', () => {
-          fileStream.end();
-          resolve();
-        });
-        reader.on('error', reject);
-        fileStream.on('error', reject);
+      // Download ZIP with auth
+      const response = await request(artifactUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.token}`,
+          'User-Agent': 'AutoCliper-CLI',
+          'Accept': 'application/vnd.github+json',
+        },
+        // @ts-ignore - maxRedirections exists in undici
+        maxRedirections: 5,
       });
 
-      // Verify file exists
-      if (!fs.existsSync(outputPath)) {
-        throw new Error(`${GITHUB_ERROR_CODES.DOWNLOAD_FAILED}: Output file not created`);
+      if (response.statusCode !== 200) {
+        throw new Error(`HTTP ${response.statusCode}`);
       }
 
-      return outputPath;
+      // Save ZIP to file
+      const chunks: Buffer[] = [];
+      for await (const chunk of response.body) {
+        chunks.push(chunk as Buffer);
+      }
+      const buffer = Buffer.concat(chunks);
+      await fs.writeFile(zipPath, buffer);
+
+      // Verify ZIP exists
+      const zipStats = await fs.stat(zipPath);
+      if (zipStats.size < 100) {
+        throw new Error('ZIP file too small or empty');
+      }
+
+      // Extract ZIP
+      await new Promise<void>((resolve, reject) => {
+        createReadStream(zipPath)
+          .pipe(unzip.Extract({ path: extractDir }))
+          .on('close', resolve)
+          .on('error', reject);
+      });
+
+      // Find MP4 files
+      const files = await fs.readdir(extractDir);
+      const mp4Files = files.filter(f => f.toLowerCase().endsWith('.mp4'));
+
+      if (mp4Files.length === 0) {
+        // Check subdirectories
+        for (const file of files) {
+          const subPath = path.join(extractDir, file);
+          const stat = await fs.stat(subPath);
+          if (stat.isDirectory()) {
+            const subFiles = await fs.readdir(subPath);
+            const subMp4 = subFiles.filter(f => f.toLowerCase().endsWith('.mp4'));
+            if (subMp4.length > 0) {
+              return path.join(subPath, subMp4[0]);
+            }
+          }
+        }
+        throw new Error(`${GITHUB_ERROR_CODES.DOWNLOAD_FAILED}: No MP4 files found in artifact`);
+      }
+
+      // Copy to output directory if specified
+      const mp4Path = path.join(extractDir, mp4Files[0]);
+
+      if (outputDir) {
+        await fs.ensureDir(outputDir);
+        const destPath = path.join(outputDir, mp4Files[0]);
+        await fs.copy(mp4Path, destPath);
+        return destPath;
+      }
+
+      return mp4Path;
+
     } catch (err) {
       const error = err as Error;
-
-      // Re-throw our custom errors
-      if (error.message.startsWith('[E06')) {
-        throw error;
-      }
-
-      // Wrap other errors
+      if (error.message.startsWith('[E06')) throw error;
       throw new Error(`${GITHUB_ERROR_CODES.DOWNLOAD_FAILED}: ${error.message}`);
     }
   }
 
-  /**
-   * List all artifacts for a workflow run
-   * @param runId - Workflow run ID
-   * @returns Array of artifact info
-   */
   async listArtifacts(runId: number): Promise<Array<{ id: number; name: string; size: number }>> {
     const url = `${API_BASE}/repos/${this.config.owner}/${this.config.repo}/actions/runs/${runId}/artifacts`;
 
@@ -399,10 +314,10 @@ export class GitHubService {
       const response = await request(url, {
         method: 'GET',
         headers: this.headers,
-        timeout: 10000,
+        signal: AbortSignal.timeout(10000),
       });
 
-      const data = await response.body.json();
+      const data = await response.body.json() as any;
 
       if (!data.artifacts) {
         return [];
@@ -415,21 +330,12 @@ export class GitHubService {
       }));
     } catch (err) {
       const error = err as Error;
-
-      if (error.message.startsWith('[E06')) {
-        throw error;
-      }
-
+      if (error.message.startsWith('[E06')) throw error;
       throw new Error(`${GITHUB_ERROR_CODES.API_ERROR}: Failed to list artifacts: ${error.message}`);
     }
   }
 
-  /**
-   * Download all artifacts from a workflow run
-   * @param runId - Workflow run ID
-   * @returns Array of downloaded file paths
-   */
-  async downloadAllArtifacts(runId: number): Promise<string[]> {
+  async downloadAllArtifacts(runId: number, outputDir?: string): Promise<string[]> {
     const artifacts = await this.listArtifacts(runId);
 
     if (artifacts.length === 0) {
@@ -439,8 +345,12 @@ export class GitHubService {
     const results: string[] = [];
 
     for (const artifact of artifacts) {
-      const filePath = await this.downloadArtifact(runId, artifact.name);
-      results.push(filePath);
+      try {
+        const filePath = await this.downloadArtifact(runId, outputDir);
+        results.push(filePath);
+      } catch (err) {
+        console.error(`Failed to download artifact ${artifact.name}:`, err);
+      }
     }
 
     return results;
@@ -450,11 +360,6 @@ export class GitHubService {
   // Private Methods
   // ========================================================================
 
-  /**
-   * Send repository_dispatch event
-   * @param url - Dispatch endpoint URL
-   * @param payload - Job payload
-   */
   private async sendDispatch(url: string, payload: JobPayload): Promise<void> {
     const response = await request(url, {
       method: 'POST',
@@ -466,20 +371,15 @@ export class GitHubService {
         event_type: 'render-video',
         client_payload: payload,
       }),
-      timeout: 15000,
+      signal: AbortSignal.timeout(15000),
     });
 
-    // GitHub returns 204 No Content on success
     if (response.statusCode !== 204) {
       const text = await response.body.text();
       throw new Error(`${GITHUB_ERROR_CODES.API_ERROR}: Unexpected response ${response.statusCode}: ${text}`);
     }
   }
 
-  /**
-   * Sleep for specified milliseconds
-   * @param ms - Milliseconds to sleep
-   */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -489,21 +389,12 @@ export class GitHubService {
 // Utility Functions
 // ============================================================================
 
-/**
- * Generate a unique job ID
- * @returns Job ID in format ac-{timestamp}-{random}
- */
 export function generateJobId(): string {
   const timestamp = Date.now();
   const random = nanoid(6);
   return `ac-${timestamp}-${random}`;
 }
 
-/**
- * Create GitHubService with default renderer repo config
- * @param token - GitHub personal access token
- * @returns GitHubService instance configured for renderer-clips repo
- */
 export function createRendererService(token: string): GitHubService {
   return new GitHubService({
     token,

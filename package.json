@@ -43,7 +43,8 @@
     "nanoid": "^5.0.9",
     "node-machine-id": "^1.1.12",
     "ora": "^9.1.0",
-    "undici": "^7.3.0"
+    "undici": "^7.3.0",
+    "unzip-stream": "^0.3.4"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",
