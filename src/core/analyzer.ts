@@ -177,7 +177,7 @@ const PROMPT_TEMPLATE = 'You are a Viral Content Analyst with 10 years of experi
 '    "start": "HH:MM:SS",\n' +
 '    "end": "HH:MM:SS",\n' +
 '    "duration_seconds": 45,\n' +
-'    "hook_text": "First few words that create the hook...",\n' +
+'    "hook_text": "Hook opening (MAX 8-10 words, punchy & catchy)",\n' +
 '    "hook_category": "CURIOSITY|CONTROVERSY|RELATABILITY|SHOCK|STORY|CHALLENGE",\n' +
 '    "why_viral": "Brief explanation of viral potential...",\n' +
 '    "viral_score": 85,\n' +
