@@ -106,7 +106,9 @@ npm run pkg:all              # Build all platforms
 - ora: ^9.1.0 (latest stable)
 - @deepgram/sdk: ^4.11.3 (v5 is beta, use v4 for stability)
 - @google/genai: ^1.38.0 (correct package - NOT @google/generative-ai)
-- undici: ^7.3.0 (HTTP client for GitHub API, fetch-native)
+- undici: ^7.3.0 (HTTP client, use `AbortSignal.timeout()` for timeouts)
+
+**Build tool:** tsup with ES modules, targeting Node 20+, platform: node, minify enabled.
 
 ### External Tools (Auto-installed via `autocliper init`)
 - **FFmpeg** 7.1 - from github.com/BtbN/FFmpeg-Builds
@@ -205,9 +207,9 @@ import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey });
 const response = await ai.models.generateContent({
-  model: 'gemini-2.5-flash',  // or gemini-2.0-flash
+  model: 'gemini-2.5-flash',
   contents: prompt,
-  config: { temperature: 0.3, topP: 0.8, maxOutputTokens: 4096 }
+  config: { temperature: 0.3, topP: 0.8, maxOutputTokens: 8192 }
 });
 ```
 
@@ -224,6 +226,7 @@ const response = await request(url, {
     'User-Agent': 'AutoCliper-CLI',
   },
   body: JSON.stringify(payload),
+  signal: AbortSignal.timeout(15000), // Use AbortSignal.timeout for timeouts
 });
 ```
 
@@ -269,9 +272,13 @@ x  X (error)
 
 Example:
 ```typescript
-console.log('> Downloading video...');
-console.log('+ Download complete');
-console.log('x Error: Invalid URL');
+import { log, success, error, blank, separator } from '../utils/logger.js';
+
+log('Downloading video...');
+success('Download complete');
+error('Invalid URL');
+blank(); // Empty line
+separator(); // Horizontal line
 ```
 
 ### Error Format
@@ -342,6 +349,8 @@ const configDir = path.join(os.homedir(), '.autocliper');
 9. NEVER import CommonJS modules directly - use `createRequire` for CJS deps like `node-machine-id`
 10. NEVER use `fetch` directly - use `undici` `request()` for HTTP (Node compatibility)
 
+Note: `installer.ts` uses `fetch` for binary file downloads (not API calls) because it needs native Response.arrayBuffer() support.
+
 ---
 
 ## Key Implementation Patterns
@@ -375,6 +384,16 @@ set('api.github.token', 'ghp_...');
 
 Config stored in: `~/.autocliper/config.json`
 
+Config structure includes:
+- `api.deepgram` - Deepgram API key
+- `api.gemini` - Gemini API key
+- `api.github.token` - GitHub personal access token
+- `api.github.owner` - GitHub repo owner (default: keymodirans)
+- `api.github.repo` - GitHub repo name (default: renderer-clips)
+- `preferences.outputFolder` - Output path (default: ~/Downloads/autocliper)
+- `preferences.maxSegments` - Max clips to generate (default: 3)
+- `subtitle.fontFamily`, `subtitle.fontSize`, `subtitle.highlightColor` - Subtitle styling
+
 ### Tool Path Resolution
 
 Always use `getToolPath()` from `core/installer.ts` - returns local bin path if tool exists, otherwise system PATH:
@@ -394,6 +413,8 @@ Always use retry wrappers for:
 - Deepgram API calls
 - Gemini API calls
 - GitHub API calls (also has internal retry via `retryApi` in `github.ts`)
+
+Note: Some modules like `analyzer.ts` define their own internal `retryApi` function to handle module-specific error re-throwing logic.
 
 ### Run Command Flow (All 11 Steps)
 
@@ -432,9 +453,20 @@ All steps include retry logic with exponential backoff.
 | Service | Model |
 |---------|-------|
 | Deepgram | nova-3 |
-| Gemini | gemini-2.0-flash or gemini-2.5-flash |
+| Gemini | gemini-2.5-flash |
 
 ---
+
+## GitHub Actions Integration
+
+The CLI triggers a Remotion renderer via GitHub Actions repository dispatch:
+- **Default repository**: `keymodirans/renderer-clips`
+- **Event type**: `render-video`
+- **Payload**: `{ jobId, videoUrl, props }` where `props` is the Remotion render props JSON
+- **Timeout**: 30 minutes per workflow run (default)
+- **Poll interval**: 10 seconds
+
+The renderer must accept the same `client_payload` structure and output MP4 artifacts.
 
 ## Key Files Reference
 
