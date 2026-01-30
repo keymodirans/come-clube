@@ -154,7 +154,7 @@ export async function transcribe(
     );
 
     // Extract transcript data
-    const metadata = result.metadata?.metadata;
+    const metadata = result.metadata;
     const channel = result.results?.channels?.[0];
     const alternatives = channel?.alternatives?.[0];
 
