@@ -229,27 +229,23 @@ export class GitHubService {
     await fs.ensureDir(extractDir);
 
     try {
-      // Download ZIP with auth
-      const response = await request(artifactUrl, {
+      // Download ZIP with auth using native fetch (auto-follow redirect)
+      const response = await fetch(artifactUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.config.token}`,
           'User-Agent': 'AutoCliper-CLI',
           'Accept': 'application/vnd.github+json',
         },
-        maxRedirections: 5,
+        redirect: 'follow',  // Auto follow redirects
       });
 
-      if (response.statusCode !== 200) {
-        throw new Error(`HTTP ${response.statusCode}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      // Save ZIP to file
-      const chunks: Buffer[] = [];
-      for await (const chunk of response.body) {
-        chunks.push(chunk as Buffer);
-      }
-      const buffer = Buffer.concat(chunks);
+      // Get buffer and save to file
+      const buffer = Buffer.from(await response.arrayBuffer());
       await fs.writeFile(zipPath, buffer);
 
       // Verify ZIP exists and has content
