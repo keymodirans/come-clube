@@ -10,8 +10,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import { createReadStream } from 'fs';
-// @ts-ignore - unzip-stream is CommonJS
-import unzip from 'unzip-stream';
+import unzipper from 'unzipper';
 
 // ============================================================================
 // Interfaces
@@ -216,7 +215,7 @@ export class GitHubService {
   }
 
   /**
-   * Download and extract artifact ZIP from workflow run
+   * Download and extract artifact ZIP - returns path to MP4 file
    */
   async downloadArtifact(runId: number, outputDir?: string): Promise<string> {
     const artifactUrl = await this.getArtifactUrl(runId);
@@ -238,7 +237,6 @@ export class GitHubService {
           'User-Agent': 'AutoCliper-CLI',
           'Accept': 'application/vnd.github+json',
         },
-        // @ts-ignore - maxRedirections exists in undici
         maxRedirections: 5,
       });
 
@@ -254,47 +252,58 @@ export class GitHubService {
       const buffer = Buffer.concat(chunks);
       await fs.writeFile(zipPath, buffer);
 
-      // Verify ZIP exists
+      // Verify ZIP exists and has content
       const zipStats = await fs.stat(zipPath);
-      if (zipStats.size < 100) {
+      console.log(`  ZIP downloaded: ${zipPath} (${zipStats.size} bytes)`);
+
+      if (zipStats.size < 1000) {
         throw new Error('ZIP file too small or empty');
       }
 
-      // Extract ZIP
+      // Extract ZIP using unzipper
       await new Promise<void>((resolve, reject) => {
         createReadStream(zipPath)
-          .pipe(unzip.Extract({ path: extractDir }))
+          .pipe(unzipper.Extract({ path: extractDir }))
           .on('close', resolve)
           .on('error', reject);
       });
 
-      // Find MP4 files
-      const files = await fs.readdir(extractDir);
-      const mp4Files = files.filter(f => f.toLowerCase().endsWith('.mp4'));
+      console.log(`  Extracted to: ${extractDir}`);
 
-      if (mp4Files.length === 0) {
-        // Check subdirectories
-        for (const file of files) {
-          const subPath = path.join(extractDir, file);
-          const stat = await fs.stat(subPath);
-          if (stat.isDirectory()) {
-            const subFiles = await fs.readdir(subPath);
-            const subMp4 = subFiles.filter(f => f.toLowerCase().endsWith('.mp4'));
-            if (subMp4.length > 0) {
-              return path.join(subPath, subMp4[0]);
-            }
+      // Find MP4 files recursively
+      const findMp4 = async (dir: string): Promise<string | null> => {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+
+          if (entry.isDirectory()) {
+            const found = await findMp4(fullPath);
+            if (found) return found;
+          } else if (entry.name.toLowerCase().endsWith('.mp4')) {
+            return fullPath;
           }
         }
+        return null;
+      };
+
+      const mp4Path = await findMp4(extractDir);
+
+      if (!mp4Path) {
+        // List what was extracted for debugging
+        const files = await fs.readdir(extractDir);
+        console.log(`  Extracted files: ${files.join(', ')}`);
         throw new Error(`${GITHUB_ERROR_CODES.DOWNLOAD_FAILED}: No MP4 files found in artifact`);
       }
 
-      // Copy to output directory if specified
-      const mp4Path = path.join(extractDir, mp4Files[0]);
+      console.log(`  Found MP4: ${mp4Path}`);
 
+      // Copy to output directory if specified
       if (outputDir) {
         await fs.ensureDir(outputDir);
-        const destPath = path.join(outputDir, mp4Files[0]);
+        const destPath = path.join(outputDir, path.basename(mp4Path));
         await fs.copy(mp4Path, destPath);
+        console.log(`  Copied to: ${destPath}`);
         return destPath;
       }
 
@@ -302,6 +311,7 @@ export class GitHubService {
 
     } catch (err) {
       const error = err as Error;
+      console.error(`  Download error: ${error.message}`);
       if (error.message.startsWith('[E06')) throw error;
       throw new Error(`${GITHUB_ERROR_CODES.DOWNLOAD_FAILED}: ${error.message}`);
     }
