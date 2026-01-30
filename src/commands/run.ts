@@ -14,7 +14,7 @@ import { withRetry } from '../utils/retry.js';
 import { transcribe, type TranscriptResult } from '../core/transcriber.js';
 import { analyzeViral, type ViralSegment, parseTimestamp } from '../core/analyzer.js';
 import { detectFaces, type Segment } from '../core/faceDetector.js';
-import { buildProps, validateAllProps, type FaceDetectionResult, type SegmentProps } from '../core/propsBuilder.js';
+import { buildProps, validateAllProps, SUBTITLE_PRESETS, type SubtitlePreset, type FaceDetectionResult, type SegmentProps } from '../core/propsBuilder.js';
 import { uploadFile } from '../services/storage.js';
 import { GitHubService, generateJobId, type GitHubConfig, type WorkflowRun } from '../services/github.js';
 import type { UploadResult } from '../services/storage.js';
@@ -28,7 +28,8 @@ export const runCommand = new Command('run')
   .argument('<url>', 'YouTube video URL')
   .option('-m, --max <number>', 'Maximum number of clips to generate', '3')
   .option('-l, --language <code>', 'Video language code (id, en)', 'id')
-  .action(async (url: string, options: { max?: string; language?: string }) => {
+  .option('-p, --preset <style>', 'Subtitle preset: HORMOZI, MRBEAST, CLASSIC, KARAOKE, NEON, MINIMAL', 'HORMOZI')
+  .action(async (url: string, options: { max?: string; language?: string; preset?: string }) => {
     blank();
     separator();
     log('Processing video...');
@@ -36,7 +37,7 @@ export const runCommand = new Command('run')
 
     // Validate URL format
     if (!isValidYouTubeUrl(url)) {
-      error('[E010] Invalid YouTube URL');
+      error('[E009] Invalid YouTube URL');
       blank();
       log('Please provide a valid YouTube video URL:');
       log('  - https://www.youtube.com/watch?v=...');
@@ -91,7 +92,19 @@ export const runCommand = new Command('run')
     log(`URL:      ${url}`);
     log(`Max clips: ${options.max}`);
     log(`Language: ${options.language}`);
+    log(`Preset:   ${options.preset}`);
     blank();
+
+    // Validate preset
+    const validPresets: SubtitlePreset[] = SUBTITLE_PRESETS;
+    const selectedPreset = (options.preset?.toUpperCase() || 'HORMOZI') as SubtitlePreset;
+    if (!validPresets.includes(selectedPreset)) {
+      error(`[E008] Invalid preset: ${options.preset}`);
+      blank();
+      log(`Valid presets: ${validPresets.join(', ')}`);
+      separator();
+      process.exit(1);
+    }
 
     // Track temp files for cleanup
     const tempFiles: string[] = [];
@@ -271,6 +284,7 @@ export const runCommand = new Command('run')
         segments: analysisResult.segments,
         words: transcriptResult.words,
         faceDetections,
+        subtitlePreset: selectedPreset,
       });
 
       // Validate props
@@ -325,16 +339,9 @@ export const runCommand = new Command('run')
         status?: WorkflowRun;
       }> = [];
 
-      // Trigger render jobs (limit to 2 concurrent)
-      const MAX_CONCURRENT = 2;
+      // Trigger render jobs for all segments
+      // Note: GitHub Actions will queue workflows based on repository concurrency settings
       for (let i = 0; i < props.length; i++) {
-        // Check concurrent limit
-        const activeJobs = renderJobs.filter(j => !j.status || j.status.status !== 'completed').length;
-        if (activeJobs >= MAX_CONCURRENT) {
-          log(`Waiting for active jobs to complete... (${activeJobs}/${MAX_CONCURRENT} running)`);
-          blank();
-        }
-
         const prop = props[i];
         const jobId = generateJobId();
 
@@ -576,3 +583,4 @@ export const runCommand = new Command('run')
       process.exit(1);
     }
   });
+

@@ -130,12 +130,12 @@ export async function getVideoDuration(videoPath: string): Promise<number> {
         const duration = parseFloat(stdout.trim());
         resolve(isNaN(duration) ? 0 : duration);
       } else {
-        reject(new Error(`[E010] Failed to get video duration: ${stderr || `exit code ${code}`}`));
+        reject(new Error(`[E015] Failed to get video duration: ${stderr || `exit code ${code}`}`));
       }
     });
 
     ffprobe.on('error', (err) => {
-      reject(new Error(`[E010] FFprobe error: ${err.message}`));
+      reject(new Error(`[E015] FFprobe error: ${err.message}`));
     });
   });
 }
@@ -212,13 +212,13 @@ export async function downloadVideo(
 
   // Validate URL
   if (!isValidYouTubeUrl(url)) {
-    throw new Error('[E011] Invalid YouTube URL');
+    throw new Error('[E016] Invalid YouTube URL');
   }
 
   // Check if yt-dlp is installed
   const tools = checkToolsInstalled();
   if (!tools.ytdlp) {
-    throw new Error('[E007] yt-dlp is not installed. Run: autocliper init');
+    throw new Error('[E015] yt-dlp is not installed. Run: autocliper init');
   }
 
   // Generate output path
@@ -229,7 +229,7 @@ export async function downloadVideo(
   return new Promise<DownloadResult>((resolve, reject) => {
     const ytdlpPath = getToolPath(TOOLS.YT_DLP);
     const args = [
-      '-f', 'best', // Best quality
+      '-f', 'bv*+ba/b', // Best video + audio, fallback to best
       '-o', outputPath, // Output file
       '--merge-output-format', 'mp4', // Ensure MP4 format
       '--no-playlist', // Download single video only
@@ -264,7 +264,7 @@ export async function downloadVideo(
       if (code === 0) {
         // Verify file exists
         if (!existsSync(outputPath)) {
-          reject(new Error('[E012] Download failed - output file not found'));
+          reject(new Error('[E017] Download failed - output file not found'));
           return;
         }
 
@@ -279,10 +279,10 @@ export async function downloadVideo(
             size,
           });
         } catch (err) {
-          reject(new Error(`[E013] Failed to process downloaded video: ${(err as Error).message}`));
+          reject(new Error(`[E018] Failed to process downloaded video: ${(err as Error).message}`));
         }
       } else {
-        reject(new Error(`[E014] yt-dlp failed: ${stderr || `exit code ${code}`}`));
+        reject(new Error(`[E019] yt-dlp failed: ${stderr || `exit code ${code}`}`));
       }
     });
 
@@ -290,7 +290,7 @@ export async function downloadVideo(
       if (progress) {
         progress.stop();
       }
-      reject(new Error(`[E015] yt-dlp spawn error: ${err.message}`));
+      reject(new Error(`[E024] yt-dlp spawn error: ${err.message}`));
     });
   });
 }
@@ -314,12 +314,12 @@ export async function extractAudio(
   // Check if FFmpeg is installed
   const tools = checkToolsInstalled();
   if (!tools.ffmpeg) {
-    throw new Error('[E007] FFmpeg is not installed. Run: autocliper init');
+    throw new Error('[E015] FFmpeg is not installed. Run: autocliper init');
   }
 
   // Check if input file exists
   if (!existsSync(input)) {
-    throw new Error(`[E016] Input file not found: ${input}`);
+    throw new Error(`[E025] Input file not found: ${input}`);
   }
 
   // Generate output path if not provided
@@ -358,7 +358,7 @@ export async function extractAudio(
         try {
           // Verify output file exists
           if (!existsSync(audioPath)) {
-            reject(new Error('[E017] Audio extraction failed - output file not found'));
+            reject(new Error('[E026] Audio extraction failed - output file not found'));
             return;
           }
 
@@ -371,17 +371,17 @@ export async function extractAudio(
             size,
           });
         } catch (err) {
-          reject(new Error(`[E018] Failed to process extracted audio: ${(err as Error).message}`));
+          reject(new Error(`[E027] Failed to process extracted audio: ${(err as Error).message}`));
         }
       } else {
         if (spinner) spinner.fail('Audio extraction failed');
-        reject(new Error(`[E019] FFmpeg failed: ${stderr || `exit code ${code}`}`));
+        reject(new Error(`[E028] FFmpeg failed: ${stderr || `exit code ${code}`}`));
       }
     });
 
     ffmpeg.on('error', (err) => {
       if (spinner) spinner.fail('FFmpeg error');
-      reject(new Error(`[E019] FFmpeg spawn error: ${err.message}`));
+      reject(new Error(`[E029] FFmpeg spawn error: ${err.message}`));
     });
   });
 }

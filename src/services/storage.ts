@@ -42,11 +42,11 @@ export interface StorageConfig {
 // ============================================================================
 
 export const STORAGE_ERROR_CODES = {
-  FILE_NOT_FOUND: '[E040] File not found',
-  UPLOAD_FAILED: '[E040] Upload failed',
-  INVALID_RESPONSE: '[E041] Invalid response from storage service',
-  FILE_TOO_LARGE: '[E042] File size exceeds maximum allowed',
-  TIMEOUT: '[E043] Upload timed out',
+  FILE_NOT_FOUND: '[E080] File not found',
+  UPLOAD_FAILED: '[E081] Upload failed',
+  INVALID_RESPONSE: '[E082] Invalid response from storage service',
+  FILE_TOO_LARGE: '[E083] File size exceeds maximum allowed',
+  TIMEOUT: '[E084] Upload timed out',
 } as const;
 
 // ============================================================================

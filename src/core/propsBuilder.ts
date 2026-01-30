@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Props Builder - Generates Remotion render props for viral segments
  *
  * Converts viral segment analysis results into Remotion-compatible JSON props
@@ -6,6 +6,14 @@
  */
 
 import { nanoid } from 'nanoid';
+
+// ============================================================================
+// Subtitle Presets
+// ============================================================================
+
+export type SubtitlePreset = 'HORMOZI' | 'MRBEAST' | 'CLASSIC' | 'KARAOKE' | 'NEON' | 'MINIMAL';
+
+export const SUBTITLE_PRESETS: SubtitlePreset[] = ['HORMOZI', 'MRBEAST', 'CLASSIC', 'KARAOKE', 'NEON', 'MINIMAL'];
 import type { ViralSegment } from './analyzer.js';
 import type { Word } from './transcriber.js';
 
@@ -121,6 +129,8 @@ export interface SegmentProps {
   hookText: string;
   /** Hook overlay style configuration */
   hookStyle: HookStyle;
+  /** Subtitle preset style */
+  subtitlePreset?: SubtitlePreset;
 }
 
 /**
@@ -139,6 +149,8 @@ export interface PropsBuilderOptions {
   fps?: number;
   /** Video dimensions (default: 1080x1920 for 9:16 vertical) */
   dimensions?: { width: number; height: number };
+  /** Subtitle preset (default: HORMOZI) */
+  subtitlePreset?: SubtitlePreset;
 }
 
 // ============================================================================
@@ -232,6 +244,7 @@ export function buildProps(options: PropsBuilderOptions): SegmentProps[] {
     faceDetections,
     fps = 30,
     dimensions = { width: 1080, height: 1920 },
+    subtitlePreset = 'HORMOZI',
   } = options;
 
   // Validate inputs
@@ -297,6 +310,7 @@ export function buildProps(options: PropsBuilderOptions): SegmentProps[] {
       subtitleStyle: { ...DEFAULT_SUBTITLE_STYLE },
       hookText: segment.hook_text,
       hookStyle: { ...DEFAULT_HOOK_STYLE },
+      subtitlePreset,
     };
 
     props.push(segmentProps);
@@ -408,3 +422,4 @@ export function validateAllProps(propsArray: SegmentProps[]): boolean {
 
   return true;
 }
+
