@@ -217,13 +217,21 @@ function filterWordsForSegment(
   startTime: number,
   endTime: number
 ): PropWord[] {
-  return words
-    .filter(w => w.start >= startTime && w.end <= endTime)
-    .map(w => ({
-      word: w.punctuated_word || w.word,
-      start: w.start,
-      end: w.end,
-    }));
+  // Filter and convert to RELATIVE timestamps (start from 0 for each segment)
+  const segmentWords = words.filter(w => w.start >= startTime && w.end <= endTime);
+
+  if (segmentWords.length === 0) {
+    return [];
+  }
+
+  // Get the offset to convert to relative time
+  const offset = segmentWords[0].start;
+
+  return segmentWords.map(w => ({
+    word: w.punctuated_word || w.word,
+    start: w.start - offset,  // Relative to segment start
+    end: w.end - offset,      // Relative to segment start
+  }));
 }
 
 // ============================================================================
